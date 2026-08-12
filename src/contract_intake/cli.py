@@ -15,11 +15,13 @@ import sys
 
 from sqlalchemy import func, select
 
+from contract_intake.adapters.imap import ImapMailbox
 from contract_intake.config import get_settings
 from contract_intake.db.engine import init_db, session_scope
 from contract_intake.db.models import Attachment, LLMCall
 from contract_intake.llm.client import LLMClient
 from contract_intake.pipeline.runner import STAGE_BY_NUMBER, STAGES, advance, drain
+from contract_intake.pipeline.stage_01_receive import ImapSource
 
 
 def _cmd_stage(args: argparse.Namespace) -> int:
@@ -43,6 +45,24 @@ def _cmd_stage(args: argparse.Namespace) -> int:
             f"stage {stage.number:02d} {stage.name}: "
             f"{type(outcome).__name__} -> {attachment.status}"
         )
+    return 0
+
+
+def _cmd_poll(args: argparse.Namespace) -> int:
+    """Fetch new mail, then advance everything it produced."""
+    source = ImapSource()
+    with session_scope() as session:
+        created = asyncio.run(source.poll(session, get_settings()))
+        print(f"intake: {len(created)} new attachment(s) {created or ''}")
+        if created and not args.intake_only:
+            moved = asyncio.run(drain(session=session, llm=LLMClient(session)))
+            print(f"pipeline: {moved} transition(s)")
+    return 0
+
+
+def _cmd_mailbox(_args: argparse.Namespace) -> int:
+    """Connectivity check against the configured folder."""
+    print(json.dumps(ImapMailbox(get_settings()).probe(), indent=2))
     return 0
 
 
@@ -90,6 +110,11 @@ def main() -> int:
     p_stage.add_argument("--attachment-id", type=int, required=True)
     p_stage.set_defaults(func=_cmd_stage)
 
+    p_poll = sub.add_parser("poll", help="fetch new mail and run the pipeline")
+    p_poll.add_argument("--intake-only", action="store_true", help="stop after stage 01")
+    p_poll.set_defaults(func=_cmd_poll)
+
+    sub.add_parser("mailbox", help="IMAP connectivity check").set_defaults(func=_cmd_mailbox)
     sub.add_parser("drain", help="advance all pending work").set_defaults(func=_cmd_drain)
     sub.add_parser("costs", help="print the cost ledger").set_defaults(func=_cmd_costs)
     sub.add_parser("stages", help="print the pipeline").set_defaults(func=_cmd_stages)
