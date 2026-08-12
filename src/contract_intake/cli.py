@@ -19,6 +19,8 @@ from contract_intake.adapters.imap import ImapMailbox
 from contract_intake.config import get_settings
 from contract_intake.db.engine import init_db, session_scope
 from contract_intake.db.models import Attachment, LLMCall
+from contract_intake.knowledge.policy import get_index, parse_playbook
+from contract_intake.knowledge.vendors import load_registry
 from contract_intake.llm.client import LLMClient
 from contract_intake.pipeline.runner import STAGE_BY_NUMBER, STAGES, advance, drain
 from contract_intake.pipeline.stage_01_receive import ImapSource
@@ -73,6 +75,26 @@ def _cmd_drain(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_knowledge(args: argparse.Namespace) -> int:
+    """Inspect, and optionally rebuild, the knowledge base."""
+    settings = get_settings()
+    settings.ensure_dirs()
+    vendors = load_registry()
+    clauses = parse_playbook()
+
+    index = get_index(settings.chroma_dir)
+    if args.build:
+        index.build(clauses)
+
+    approved = sum(1 for v in vendors if not v.is_suspended)
+    print(f"vendors:  {len(vendors)} ({approved} approved, {len(vendors) - approved} suspended)")
+    print(f"playbook: {len(clauses)} clause(s) -> {settings.chroma_dir}")
+    if args.query:
+        for hit in index.search(args.query, k=3):
+            print(f"  {hit.score:.3f}  {hit.clause.citation}")
+    return 0
+
+
 def _cmd_costs(_args: argparse.Namespace) -> int:
     with session_scope() as session:
         rows = session.execute(
@@ -115,6 +137,11 @@ def main() -> int:
     p_poll.set_defaults(func=_cmd_poll)
 
     sub.add_parser("mailbox", help="IMAP connectivity check").set_defaults(func=_cmd_mailbox)
+
+    p_kb = sub.add_parser("knowledge", help="inspect or rebuild the knowledge base")
+    p_kb.add_argument("--build", action="store_true")
+    p_kb.add_argument("--query", help="try a policy lookup")
+    p_kb.set_defaults(func=_cmd_knowledge)
     sub.add_parser("drain", help="advance all pending work").set_defaults(func=_cmd_drain)
     sub.add_parser("costs", help="print the cost ledger").set_defaults(func=_cmd_costs)
     sub.add_parser("stages", help="print the pipeline").set_defaults(func=_cmd_stages)

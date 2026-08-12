@@ -15,6 +15,8 @@ help:  ## Show this help
 setup: .venv  ## Create venv and install the project with dev extras
 	$(PIP) install --quiet --upgrade pip
 	$(PIP) install --quiet -e ".[dev]"
+	@echo "fetching the embedding model (~80MB, once)..."
+	@$(PY) -m contract_intake.cli knowledge --build >/dev/null
 	@echo "ready. copy .env.example to .env and fill in ANTHROPIC_API_KEY"
 
 .PHONY: test
@@ -43,6 +45,10 @@ poll:  ## Run the IMAP poller + pipeline worker
 .PHONY: stage
 stage:  ## Re-run one stage: make stage N=04 ID=17
 	$(PY) -m contract_intake.cli stage --number $(N) --attachment-id $(ID)
+
+.PHONY: knowledge
+knowledge:  ## Rebuild the policy index and print registry stats
+	$(PY) -m contract_intake.cli knowledge --build
 
 .PHONY: costs
 costs:  ## Print the cost ledger summary
