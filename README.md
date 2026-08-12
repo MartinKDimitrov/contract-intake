@@ -6,9 +6,9 @@ contracting playbook, and routes the result: clean and on-policy contracts are
 stored, anything uncertain or off-policy goes to a human with the specific reason
 attached.
 
-> **Status: phase 0 of 8 — skeleton.** The pipeline, its contract and the cost
-> ledger are in place and tested; the phases themselves land next. See
-> [Development plan](#development-plan).
+> **Status: phase 3 of 8.** Mail arrives, is triaged for free, loaded per page,
+> and extracted with verified provenance; the knowledge base is in place. The
+> agent that uses it lands next. See [Development plan](#development-plan).
 
 ## Why vendor contracts
 
@@ -83,12 +83,32 @@ Four of the seven phases spend no tokens at all. The two that do are bounded by
 a per-document USD ceiling checked before each call.
 
 The largest single lever is stage 03, which spends nothing itself but decides
-**per page** between text and vision: a 20-page contract sent as text is roughly
-15k tokens, and as page images roughly 95k. A born-digital contract with one
-scanned signature page therefore sends 19 text pages and exactly one image.
+**per page** between text and vision. Measured on the fixtures:
 
-Measured per-document costs: _pending (phase 7)_. Breakdown in
-[docs/COST_MODEL.md](docs/COST_MODEL.md).
+| | tokens |
+|---|---|
+| a page with a text layer | ~250 |
+| the same page rendered as an image | ~1850 |
+
+So a born-digital contract with one scanned signature page sends 19 pages of
+text and exactly one image, instead of twenty images.
+
+Extraction, measured end to end at `effort=medium`:
+
+| document | in | cache read | out | USD |
+|---|---|---|---|---|
+| 2-page born-digital contract | 765 | 3507 | 941 | $0.049 |
+| 1-page contract, text layer | 432 | 3507 | 1225 | $0.035 |
+| 1-page scan, no text layer | 1868 | 3507 | 914 | $0.034 |
+
+The cached 3507 tokens are the system prompt and JSON schema, written once and
+read at a tenth of the rate from the second document onwards. Note that output
+tokens dominate: on documents this size, how much the model *thinks* costs more
+than what it reads.
+
+`effort=medium` returned values identical to `high` on all three documents, for
+11% less and 31% faster — an indication at n=3, not yet an eval. Full breakdown
+in [docs/COST_MODEL.md](docs/COST_MODEL.md) _(phase 7)_.
 
 ```bash
 make costs          # the ledger, aggregated
@@ -100,10 +120,10 @@ curl :8000/metrics/costs
 | Phase | | Status |
 |---|---|---|
 | 0 | Skeleton: pipeline contract, state machine, cost ledger, DB | ✅ done |
-| 1 | Email intake, triage, deduplication | next |
-| 2 | Document loading, extraction with provenance | |
-| 3 | Knowledge base: vendor registry + policy playbook | |
-| 4 | Agent loop with knowledge-base tools | |
+| 1 | Email intake, triage, deduplication | ✅ done |
+| 2 | Document loading, extraction with provenance | ✅ done |
+| 3 | Knowledge base: vendor registry + policy playbook | ✅ done |
+| 4 | Agent loop with knowledge-base tools | next |
 | 5 | Deterministic routing, storage, review UI | |
 | 6 | Failure paths, retries, dead letters | |
 | 7 | Eval harness: extraction accuracy, KB contribution, effort sweep | |
