@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     # --- LLM ---------------------------------------------------------------
     anthropic_api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
     model: str = "claude-opus-5"
-    extract_effort: Effort = "high"
+    extract_effort: Effort = "medium"
     enrich_effort: Effort = "medium"
     max_usd_per_document: float = 0.75
 
@@ -47,6 +47,24 @@ class Settings(BaseSettings):
     min_field_confidence: float = 0.80
     min_vendor_match: float = 0.85
     max_attachment_mb: int = 25
+
+    # --- Cost levers (stage 03) --------------------------------------------
+    page_image_max_px: int = 1400
+    """Long edge for a page sent to vision.
+
+    Image tokens scale with area, roughly (w*h)/750. At 1568px an A4 page costs
+    about 4.6k tokens; at 1400px about 3.7k; at 1000px about 1.9k. Lower is
+    cheaper and less legible -- the setting is swept in evals/ rather than
+    guessed. This is the single largest knob on the bill.
+    """
+
+    min_text_chars_per_page: int = 60
+    """Below this a page is treated as having no usable text layer.
+
+    A scanned page often yields a few stray characters from a header stamp or a
+    stray vector glyph; that is not a text layer, and trusting it would send the
+    model an almost-empty page instead of the image.
+    """
 
     @property
     def attachments_dir(self) -> Path:
