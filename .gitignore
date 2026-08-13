@@ -16,3 +16,6 @@ evals/documents/rendered/
 .env
 .DS_Store
 evals/documents/collected/
+
+# Written by `make coverage`; the floor is enforced, the artefact is not kept.
+.coverage
