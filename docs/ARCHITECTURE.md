@@ -1,7 +1,8 @@
 # Architecture
 
-> Status: phase 0 (skeleton). Sections marked _pending_ are filled in as their
-> phase lands. Decisions and their alternatives live in [TRADEOFFS.md](TRADEOFFS.md).
+Decisions and the alternatives they beat live in [TRADEOFFS.md](TRADEOFFS.md);
+what it costs and why in [COST_MODEL.md](COST_MODEL.md); how to run and extend it
+in [HAND_OVER.md](HAND_OVER.md).
 
 ## The shape
 
@@ -16,7 +17,9 @@ policy, or into a human review queue with the specific reason it was not.
                     │ 02 triage    RECEIVED   →  TRIAGED           │  0 tokens
                     │ 03 load      TRIAGED    →  LOADED            │  0 tokens  ← cost lever
                     │ 04 extract   LOADED     →  EXTRACTED         │  LLM, structured
-                    │ 05 enrich    EXTRACTED  →  ENRICHED          │  LLM, agent + RAG
+                    │ 05 enrich    EXTRACTED  →  ENRICHED          │  checks free,
+                    │                                                 agent only if
+                    │                                                 they all pass
                     │ 06 decide    ENRICHED   →  DECIDED           │  0 tokens
                     │ 07 deliver   DECIDED    →  DELIVERED         │  0 tokens
                     └──────────────────────────────────────────────┘
@@ -123,7 +126,9 @@ This is the difference between a system that knows and one that guessed, and it
 is the only honest input to routing — stage 06 cannot make a defensible decision
 from a bare value with no evidence behind it.
 
-_Schema detail: pending (phase 2)._
+The schema is fifteen fields in `extract/schema.py`, each wrapped in `Evidence`.
+`REQUIRED_FOR_AUTO_APPROVAL` names the five that must be present and confident
+before a contract can pass without a human.
 
 ## Knowledge base
 
@@ -138,7 +143,11 @@ Two jobs, two retrieval methods, because they are not the same problem:
 Policy validation is the part the model cannot do alone — no amount of reasoning
 tells it what *this company's* liability ceiling is.
 
-_Detail: pending (phase 3)._
+Both are consulted before the agent, not by it. Counterparty resolution is a
+pure function over a closed registry; the threshold half of the playbook lives in
+`playbook_checks.json` and is evaluated in Python. The agent is called only for
+documents that pass every check, and its job is what a comparison cannot express
+— an absent right, a conflict between sources, an unusual clause.
 
 ## Cost model
 
@@ -150,7 +159,21 @@ itself — determines most of stage 04's bill by deciding per page between text
 success, refusal and exception alike. Nothing can spend without being recorded,
 which is what makes the published numbers measured rather than estimated.
 
-Full breakdown: [COST_MODEL.md](COST_MODEL.md) _(pending, phase 7)_.
+Deterministic checks run before the agent, so a document that already fails one
+costs nothing to enrich. Full breakdown: [COST_MODEL.md](COST_MODEL.md).
+
+## Two corpora
+
+The free stages run over both on every check, because they cost nothing to run
+and everything to get wrong.
+
+| | what it is | what it proves |
+|---|---|---|
+| `evals/fixtures/` | 33 generated documents: 10 contracts, 23 lookalikes | both directions — contracts pass, certificates and invoices do not |
+| `evals/corpus/` | 60 real TED procurement notices, bg/de/en | that a vocabulary claiming three languages works on documents nobody wrote for it |
+
+The corpus is fetched by `evals/corpus.py` rather than committed; the script is
+the source. Both are reported by `make triage`, which spends nothing.
 
 ## Running it
 
@@ -161,4 +184,7 @@ make lint      # ruff + mypy strict
 make run       # review UI, /healthz, /metrics/costs
 make poll      # IMAP poller + pipeline worker
 make stage N=04 ID=17
+make triage    # classify both corpora, free
+make eval      # field accuracy and knowledge-base contribution (costs money)
+make dead      # what could not be finished, and why
 ```

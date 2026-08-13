@@ -73,7 +73,8 @@ success, refusal and exception alike.
 
 Detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every decision that could
 have gone the other way, with the condition that would flip it, in
-[docs/TRADEOFFS.md](docs/TRADEOFFS.md).
+[docs/TRADEOFFS.md](docs/TRADEOFFS.md). Running it in anger:
+[docs/HAND_OVER.md](docs/HAND_OVER.md).
 
 ## Cost
 
@@ -113,6 +114,53 @@ make costs          # the ledger, aggregated
 curl :8000/metrics/costs
 ```
 
+## Tested against
+
+Two corpora with opposite jobs, and the free stages run over both.
+
+| | documents | |
+|---|---|---|
+| generated fixtures | 33 | 10 contracts and 23 lookalikes — certificates, invoices, purchase orders, board resolutions, compliance declarations, inspection reports, a credit note, a quote |
+| real EU procurement notices (TED) | 60 | Bulgarian, German and English, 1,034 pages, none of them contracts |
+
+```bash
+make corpus && make triage
+```
+
+```
+generated fixtures -- contracts that must pass, lookalikes that must not
+  33 documents: 10 contracts, 23 lookalikes
+  33/33 correct
+
+TED corpus -- real EU procurement notices, none of them contracts
+  bg:  20 documents,  356 pages  ->  turned away 20/20
+  de:  20 documents,  340 pages  ->  turned away 20/20
+  en:  20 documents,  338 pages  ->  turned away 20/20
+  60/60 correct
+```
+
+**93 documents classified correctly, without a token spent.** The sixty from TED
+matter most: they were written by European contracting authorities with no
+knowledge of this system, and they are all negatives — which is where a mistake
+is expensive, since a false positive buys an extraction on a document that could
+never produce a contract record.
+
+On the paid stages, measured over three contracts including a degraded scan:
+
+| | |
+|---|---|
+| field accuracy | 29/29 |
+| deviations found with the knowledge base | 4/4 |
+| deviations found without it | 0/4, while producing 8 findings citing nothing |
+
+That last pair is the honest test of whether retrieval improves the result. Same
+model, same contract, same extracted fields — the only difference is access to
+this company's playbook and registry.
+
+Those numbers rest on documents written for this project, and are marked as such
+in [HAND_OVER.md](docs/HAND_OVER.md). Ten real contracts are already in the
+corpus awaiting expected values.
+
 ## Roadmap
 
 Working today: intake, triage, per-page loading, extraction with verified
@@ -121,9 +169,10 @@ express, rule-based routing and a human review queue.
 
 Still open:
 
-- retry and dead-letter handling for the remaining failure paths
-- an eval harness measuring extraction accuracy, the knowledge base's
-  contribution, and the effort/cost curve
+- expected values for the ten real contracts already in the corpus, which would
+  move extraction accuracy off documents written for this project
+- batch processing, for 50% off in exchange for latency the domain can absorb
+- a fourth triage language
 
 ## Stack
 
