@@ -58,6 +58,7 @@ ignore = ["ANN401"]
 # instead by the corpus check, which runs the vocabulary against real Bulgarian
 # documents.
 "src/contract_intake/pipeline/stage_02_triage.py" = ["RUF001"]
+"tests/pipeline/test_stage_02_triage.py" = ["ANN", "RUF001"]
 
 [tool.mypy]
 python_version = "3.12"

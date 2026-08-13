@@ -81,6 +81,43 @@ def test_empty_page_is_unknown_not_contract() -> None:
     assert triage.classify_text("").kind == "unknown"
 
 
+#: One contract opening and one procurement-notice opening per supported
+#: language. The pair matters more than either half: a vocabulary can score
+#: perfectly on negatives by knowing no words at all, which is exactly how the
+#: Spanish and French terms were found to be doing nothing.
+LANGUAGE_PAIRS = [
+    ("en", "SERVICES AGREEMENT\nThe parties agree. Governing law: England.", "Contract notice"),
+    (
+        "bg",
+        "ДОГОВОР ЗА УСЛУГИ\nНастоящият договор се сключва между страните.",
+        "Обявление за поръчка",
+    ),
+    (
+        "de",
+        "DIENSTLEISTUNGSVERTRAG\nDieser Vertrag wird zwischen den Parteien.",
+        "Auftragsbekanntmachung",
+    ),
+    (
+        "es",
+        "CONTRATO DE SERVICIOS\nEl presente contrato entre el Proveedor y el Cliente.",
+        "Anuncio de licitación",
+    ),
+    (
+        "fr",
+        "CONTRAT DE SERVICES\nLe présent contrat entre le Prestataire et le Client.",
+        "Avis de marché",
+    ),
+]
+
+
+@pytest.mark.parametrize(("language", "contract", "notice"), LANGUAGE_PAIRS)
+def test_each_language_admits_contracts_and_turns_away_notices(
+    language: str, contract: str, notice: str
+) -> None:
+    assert triage.classify_text(contract).kind == "contract", language
+    assert triage.classify_text(f"{notice}\n{contract}").kind != "contract", language
+
+
 # -- content sniffing -------------------------------------------------------
 
 

@@ -214,6 +214,8 @@ CONTRACTS = frozenset(
         "21-lease-alpine-de-en",
         "38-lease-swiss-de-en",
         "39-addendum-danube",
+        "40-contrato-servicios-es",
+        "41-contrat-prestations-fr",
     }
 )
 

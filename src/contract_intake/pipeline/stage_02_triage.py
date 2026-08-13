@@ -68,6 +68,19 @@ STRONG_TERMS: tuple[str, ...] = (
     "vereinbaren die parteien",
     "anwendbares recht",
     "zwischen den parteien",
+    # Spanish
+    "el presente contrato",
+    "las partes acuerdan",
+    "ambas partes convienen",
+    "ley aplicable",
+    "en adelante",
+    # French
+    "le présent contrat",
+    "la présente convention",
+    "les parties conviennent",
+    "droit applicable",
+    "il a été convenu",
+    "ci-après",
 )
 
 #: Commercial vocabulary that supports a classification but cannot carry it. An
@@ -100,6 +113,22 @@ SUPPORTING_TERMS: tuple[str, ...] = (
     "lieferant",
     "leistungen",
     "haftung",
+    "contrato",
+    "acuerdo",
+    "las partes",
+    "proveedor",
+    "servicios",
+    "cláusula",
+    "responsabilidad",
+    "rescisión",
+    "contrat",
+    "convention",
+    "les parties",
+    "prestataire",
+    "fournisseur",
+    "prestations",
+    "responsabilité",
+    "résiliation",
 )
 
 INVOICE_TERMS: tuple[str, ...] = (
@@ -129,6 +158,18 @@ INVOICE_TERMS: tuple[str, ...] = (
     "получател",
     "кредитно известие",
     "оферта",
+    # Spanish
+    "factura n",
+    "base imponible",
+    "importe total",
+    "nota de crédito",
+    "total a pagar",
+    # French
+    "facture n",
+    "montant total",
+    "net à payer",
+    "bon de commande",
+    "avoir n",
 )
 
 #: Document types that are not contracts however they are worded. A certificate
@@ -170,6 +211,12 @@ DISQUALIFYING_TERMS: tuple[str, ...] = (
     "обявление за поръчка",
     "обявление за възложена",
     "състезателна процедура",
+    "anuncio de licitación",
+    "anuncio de adjudicación",
+    "pliego de condiciones",
+    "avis de marché",
+    "avis d'attribution",
+    "cahier des charges",
     "auftragsbekanntmachung",
     "bekanntmachung",
     "vergabebekanntmachung",

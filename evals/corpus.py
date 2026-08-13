@@ -1,20 +1,22 @@
 """Fetch a real European corpus for the free stages of the pipeline.
 
-The generated fixtures test what was imagined; this tests what exists. TED
-(Tenders Electronic Daily) publishes every EU public-procurement notice above
-threshold, each one available in all twenty-four official languages, and each
-one short -- a few pages. Three properties matter here:
+The authored and generated documents test what was imagined; this tests what
+exists. TED (Tenders Electronic Daily) publishes every EU public-procurement
+notice above threshold, each one available in all twenty-four official
+languages, and each one short -- a few pages. Three properties matter here:
 
 * **Real.** Nobody wrote these with this system in mind.
-* **Multilingual, genuinely.** The same notice in Bulgarian, German and English
-  is the honest test of a vocabulary that claims to work in three languages.
+* **Multilingual, genuinely.** The same notice in five languages is the honest
+  test of a vocabulary that claims to work in five.
 * **Negative.** A procurement notice is not a contract, and triage must say so
   without spending a token. Getting that wrong is expensive in a way getting it
   right is not: a false positive here pays for extraction on a document that was
   never going to produce a contract record.
 
-Downloads are cached under `evals/corpus/`, which is gitignored -- the fetch is
-reproducible from this script rather than committed as a few hundred PDFs.
+Downloads are cached under `evals/documents/collected/`, which is gitignored --
+the fetch is reproducible from this script rather than committed as a hundred
+PDFs. Being entirely negative, this corpus cannot on its own tell a working
+vocabulary from an empty one; see `evals/documents/README.md`.
 
     python evals/corpus.py --per-language 25
 """
@@ -28,12 +30,13 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-CORPUS = Path(__file__).parent / "corpus"
+CORPUS = Path(__file__).parent / "documents" / "collected"
 SEARCH = "https://api.ted.europa.eu/v3/notices/search"
 AGENT = "contract-intake/0.1 (eval corpus; https://github.com/MartinKDimitrov/contract-intake)"
 
-#: One Latin, one Cyrillic, one German -- the three the triage vocabulary claims.
-LANGUAGES = {"ENG": "en", "BUL": "bg", "DEU": "de"}
+#: The five the triage vocabulary claims, including one non-Latin script. Each
+#: notice is published in all of them, so the same document is tested five ways.
+LANGUAGES = {"ENG": "en", "BUL": "bg", "DEU": "de", "SPA": "es", "FRA": "fr"}
 
 #: Transport and rail, to stay in the same domain as the rest of the corpus.
 CPV = "60000000"
