@@ -206,6 +206,31 @@ async def advance(
     return outcome
 
 
+#: What each outcome looks like in the log. A pipeline nobody can follow is a
+#: pipeline nobody trusts, and the interesting part is never that a stage ran --
+#: it is which document, which phase, and what came out.
+_MARK = {"advanced": "->", "rejected": "x ", "failed": "! "}
+
+
+def _announce(attachment: Attachment, stage: Stage | None, outcome: StageOutcome) -> None:
+    """One line per document per phase, with the phase's own answer."""
+    name = (attachment.filename or "?")[:34]
+    phase = f"{stage.number:02d} {stage.name}" if stage else "??"
+
+    match outcome:
+        case Advanced(note=note):
+            mark, detail = _MARK["advanced"], note or attachment.status
+        case Rejected(reason=reason):
+            mark, detail = _MARK["rejected"], reason
+        case Failed(error=error, retryable=retryable):
+            mark = _MARK["failed"]
+            detail = f"{type(error).__name__}: {error}" + ("" if retryable else " (not retried)")
+        case _:  # pragma: no cover - the match above is exhaustive
+            mark, detail = "? ", ""
+
+    log.info("%-34s %-11s %s %s", name, phase, mark, detail)
+
+
 def _discard(savepoint: SessionTransaction) -> None:
     """Roll back the stage's writes, tolerating a session already past saving."""
     try:
@@ -351,8 +376,10 @@ async def drain(
         attachment = pick_next(session)
         if attachment is None:
             break
-        await advance(attachment, session=session, settings=settings, llm=llm)
+        stage = STAGE_BY_CONSUMES.get(Status(attachment.status))
+        outcome = await advance(attachment, session=session, settings=settings, llm=llm)
         session.commit()
+        _announce(attachment, stage, outcome)
         moved += 1
         if is_terminal(Status(attachment.status)):
             finished += 1

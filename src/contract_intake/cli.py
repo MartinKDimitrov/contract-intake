@@ -83,7 +83,7 @@ def _cmd_poll(args: argparse.Namespace) -> int:
         with session_scope() as session:
             created = asyncio.run(source.poll(session, settings))
             if created:
-                print(f"intake: {len(created)} new attachment(s) {created}", flush=True)
+                print(f"-- {len(created)} new attachment(s)", flush=True)
             if args.intake_only:
                 return
             result = asyncio.run(drain(session=session, llm=LLMClient(session)))
@@ -228,7 +228,13 @@ def _cmd_stages(_args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    # The pipeline narrates itself, one line per document per phase. Everything
+    # else -- the HTTP client, the PDF reader, the vector store -- is detail that
+    # buries it, so it speaks only when something is wrong.
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    for noisy in ("httpx", "httpcore", "pdfminer", "chromadb", "urllib3", "PIL"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+    logging.getLogger("contract_intake.loaders.document").setLevel(logging.WARNING)
     init_db(get_settings())
 
     parser = argparse.ArgumentParser(prog="contract-intake")

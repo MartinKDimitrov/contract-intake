@@ -153,13 +153,16 @@ def _persist_attachment(
 ) -> int | None:
     digest = attachment.sha256
 
+    # Same shape as every other phase's line, so a reader can follow one
+    # document down the log from arrival to filing without changing how they
+    # read. Intake is a Source rather than a Stage, so it announces itself.
     seen = session.scalar(select(Attachment).where(Attachment.sha256 == digest))
     if seen is not None:
         log.info(
-            "attachment %s duplicates #%d (%s); not reprocessing",
-            attachment.filename,
+            "%-34s %-11s x  identical to attachment %d; not reprocessing",
+            attachment.filename[:34],
+            "01 receive",
             seen.id,
-            digest[:12],
         )
         return None
 
@@ -179,6 +182,14 @@ def _persist_attachment(
     )
     session.add(row)
     session.flush()
+    log.info(
+        "%-34s %-11s -> stored as attachment %d, %.1f KB, sha256 %s",
+        attachment.filename[:34],
+        "01 receive",
+        row.id,
+        attachment.size_bytes / 1024,
+        digest[:12],
+    )
     return row.id
 
 
