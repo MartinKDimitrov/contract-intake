@@ -1,6 +1,7 @@
 # Overridable so CI can point at whatever interpreter the runner provides.
 PYTHON ?= python3.12
 PY := .venv/bin/python
+BIN := .venv/bin
 PIP := .venv/bin/pip
 
 .DEFAULT_GOAL := help
@@ -20,6 +21,7 @@ setup: .venv  ## Create venv and install the project with dev extras
 	@echo "fetching the embedding model (~80MB, once)..."
 	@$(PY) -m contract_intake.cli knowledge --build >/dev/null
 	@$(PY) evals/render.py >/dev/null
+	@git config core.hooksPath .githooks 2>/dev/null || true
 	@echo "ready. copy .env.example to .env and fill in ANTHROPIC_API_KEY"
 
 .PHONY: test
@@ -32,13 +34,63 @@ lint:  ## ruff + mypy
 	$(PY) -m ruff format --check src tests
 	$(PY) -m mypy
 
+.PHONY: check
+check: lint docs coverage audit triage verify  ## Everything a commit must pass. Runs in CI too.
+	@echo
+	@echo "check: passed -- lint, tests with a coverage floor, the external"
+	@echo "       audit, and classification of every document."
+
+.PHONY: hooks
+hooks:  ## Make `check` a condition of committing
+	@git config core.hooksPath .githooks
+	@echo "pre-commit hook enabled; 'git commit --no-verify' is the escape hatch"
+
+.PHONY: audit
+audit:  ## Checks that answer to something other than my own judgement
+	@echo "-- architecture contracts"
+	$(BIN)/lint-imports
+	@echo "-- dead code"
+	$(BIN)/vulture
+	@echo "-- complexity"
+	$(BIN)/xenon --max-absolute C --max-modules C --max-average B src
+	@echo "-- security"
+	$(BIN)/bandit -q -r src
+	@echo "-- dependency hygiene"
+	$(BIN)/deptry .
+	@echo "-- spelling"
+	$(BIN)/codespell
+	@echo "-- known vulnerabilities"
+	@# PYSEC-2026-311 is Chroma's HTTP server; we use PersistentClient and start
+	@# no server. Named rather than silenced, and justified in docs/HAND_OVER.md.
+	$(BIN)/pip-audit --progress-spinner off --ignore-vuln PYSEC-2026-311
+
+.PHONY: coverage
+coverage:  ## Tests with a floor that fails the build
+	$(PY) -m pytest -q --cov=contract_intake --cov-report=term-missing
+
+.PHONY: docs
+docs:  ## Align the tables in the documentation so they read without a renderer
+	@$(PY) scripts/align_tables.py --check || ($(PY) scripts/align_tables.py && exit 1)
+
+.PHONY: verify
+verify:  ## Quote verification over the real corpus (free)
+	$(PY) evals/verify.py
+
+.PHONY: dead
+dead:  ## What could not be finished, and why
+	$(PY) -m contract_intake.cli dead
+
+.PHONY: eval-sweep
+eval-sweep:  ## Field accuracy at each effort level (costs money)
+	$(PY) evals/run.py --sweep
+
 .PHONY: fmt
 fmt:  ## Autoformat
 	$(PY) -m ruff check --fix src tests
 	$(PY) -m ruff format src tests
 
 .PHONY: run
-run:  ## Serve the review UI + webhook on :8000
+run:  ## Serve the review UI on :8000
 	$(PY) -m uvicorn contract_intake.web.app:app --reload --port 8000
 
 .PHONY: poll

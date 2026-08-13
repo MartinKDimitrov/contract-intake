@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Everything a commit has to pass, run before it is made rather than after.
+#
+# This mirrors CI exactly. The reason it is a hook and not a habit: in the
+# history of this repository every round of fixes introduced a defect, and the
+# one that broke the whole pipeline was caught by a check that had been run --
+# just not before the commit that would have buried it.
+#
+# It takes about twenty seconds. To skip it you have to say so out loud:
+#
+#     git commit --no-verify
+#
+# which is a decision with a name, and that is the point.
+set -euo pipefail
+
+if [ ! -x .venv/bin/python ]; then
+    echo "pre-commit: no virtualenv; run 'make setup' first" >&2
+    exit 1
+fi
+
+make check
+
+# --- documentation moves with the code -------------------------------------
+#
+# Not a style rule. Five separate audits of this repository found the same
+# class of defect over and over: a claim in a document that the code had
+# stopped honouring -- "the worker picks the oldest attachment", "every
+# category is checksum-validated", "four of seven phases spend nothing". Each
+# was true when written. None was corrected in the commit that falsified it.
+#
+# So a commit that changes behaviour has to say what changed, in the same
+# commit. This does not judge whether the documentation is *good*; it only
+# refuses to let it drift silently.
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+code=$(echo "$staged" | grep -E '^src/contract_intake/.*\.py$' || true)
+docs=$(echo "$staged" | grep -E '^(README\.md|docs/.*\.md|.*/README\.md)$' || true)
+
+if [ -n "$code" ] && [ -z "$docs" ]; then
+    # A docstring counts: much of this project's reasoning lives next to the
+    # code it explains, and that is the right place for it.
+    touched_prose=$(git diff --cached -U0 -- $code | grep -cE '^\+\s*(#|"""|\*|:)' || true)
+    if [ "$touched_prose" -eq 0 ]; then
+        cat >&2 <<'MSG'
+
+pre-commit: source changed and nothing was documented.
+
+  Every audit of this repository has found claims the code had quietly stopped
+  honouring. They were all true when written.
+
+  Update whichever applies -- a docstring beside the change, docs/ARCHITECTURE.md
+  for shape, docs/TRADEOFFS.md for a decision that could have gone the other way,
+  docs/TESTING.md for what is now checked, docs/HAND_OVER.md for what will break.
+
+  If this change genuinely documents itself, say so:  git commit --no-verify
+
+MSG
+        exit 1
+    fi
+fi

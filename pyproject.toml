@@ -13,6 +13,9 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.12",
     "pdfplumber>=0.11",
+    # Imported directly by loaders/document.py for rasterising a page. It arrives
+    # as a transitive dependency of pdfplumber today; depending on that is luck.
+    "pypdfium2>=4.30",
     "pillow>=11.0",
     "chromadb>=0.5",
     "rapidfuzz>=3.10",
@@ -22,9 +25,22 @@ dependencies = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
     "ruff>=0.7",
     "mypy>=1.13",
     "fpdf2>=2.8",
+    # Checks that answer to something other than the author's judgement. Each
+    # one measures a property no reviewer can be trusted to eyeball: whether the
+    # layering holds, whether the tests would notice a bug, whether a dependency
+    # is declared, whether a docstring still describes its function.
+    "import-linter>=2.1",
+    "vulture>=2.13",
+    "xenon>=0.9",
+    "bandit>=1.8",
+    "pip-audit>=2.7",
+    "deptry>=0.21",
+    "codespell>=2.3",
+    "mutmut>=3.2",
 ]
 
 [project.scripts]
@@ -72,3 +88,114 @@ packages = ["contract_intake"]
 [[tool.mypy.overrides]]
 module = ["chromadb.*", "pdfplumber.*", "pypdfium2.*"]
 ignore_missing_imports = true
+
+
+# --- architecture, enforced rather than described ---------------------------
+#
+# ARCHITECTURE.md claims supporting machinery is used *by* stages and never the
+# other way around. A claim in a document decays; a contract here fails the
+# build. `lint-imports` reads this section.
+
+[tool.importlinter]
+root_package = "contract_intake"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Stages depend on machinery, never machinery on stages"
+type = "forbidden"
+source_modules = [
+    "contract_intake.adapters",
+    "contract_intake.loaders",
+    "contract_intake.extract",
+    "contract_intake.knowledge",
+    "contract_intake.agent",
+    "contract_intake.policy",
+    "contract_intake.store",
+]
+forbidden_modules = ["contract_intake.pipeline", "contract_intake.web"]
+
+[[tool.importlinter.contracts]]
+name = "The knowledge base does not know about the model or the queue"
+type = "forbidden"
+source_modules = ["contract_intake.knowledge"]
+forbidden_modules = ["contract_intake.llm", "contract_intake.db"]
+
+[[tool.importlinter.contracts]]
+name = "Routing is pure: policy sees no model, no database, no web"
+type = "forbidden"
+source_modules = ["contract_intake.policy"]
+forbidden_modules = ["contract_intake.llm", "contract_intake.db", "contract_intake.web"]
+
+[[tool.importlinter.contracts]]
+name = "Only llm/ and the tool decorators import the provider SDK"
+type = "forbidden"
+# Direct imports only: every stage reaches `anthropic` transitively through
+# `llm.client`, which is the point of having one. `agent.tools` is the single
+# exception and imports a decorator, not a client -- the stronger claim, that
+# nothing else *constructs* one, is checked in tests/test_provider_boundary.py
+# because no import graph can express it.
+allow_indirect_imports = true
+source_modules = [
+    "contract_intake.pipeline",
+    "contract_intake.extract",
+    "contract_intake.policy",
+    "contract_intake.knowledge",
+    "contract_intake.loaders",
+    "contract_intake.web",
+    "contract_intake.store",
+    "contract_intake.adapters",
+]
+forbidden_modules = ["anthropic"]
+
+[tool.coverage.run]
+source = ["src/contract_intake"]
+branch = true
+
+[tool.coverage.report]
+# A floor that catches a module going untested, not a target to game upward.
+# Set at what the suite actually reaches today rather than at a round number:
+# the shortfall is concentrated in `cli.py` and `web/app.py` (argument parsing
+# and routing, both thin), `adapters/imap.py` (protocol I/O, tested against a
+# fake) and the two stages whose bodies are one model call. TESTING.md names
+# them. Raise this as those are covered; never lower it to make a run pass.
+fail_under = 75
+show_missing = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src", "evals"]
+
+[tool.deptry]
+extend_exclude = ["evals", "tests"]
+known_first_party = ["contract_intake"]
+
+[tool.deptry.per_rule_ignores]
+# Declared and used, but never imported: served by an ASGI runner, loaded by
+# name at runtime, or invoked as a command line by `make lint` / `make audit`.
+DEP002 = [
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "fpdf2",
+    "import-linter",
+    "vulture",
+    "xenon",
+    "bandit",
+    "pip-audit",
+    "deptry",
+    "codespell",
+    "mutmut",
+]
+
+[tool.codespell]
+skip = "./.venv,./var,./evals/documents,./evals/fonts,./.git,*.pdf,*.ttf"
+# The vocabulary lists, the vendor registry and the test documents are
+# deliberately multilingual. Every entry here is a real word in Spanish,
+# French, German or Bulgarian, or an ISO country code.
+ignore-words-list = "aks,nd,ot,cliente,attribue,ist,aplicable,technik,fo,ba,te,som,parte,vertrag,sie,ans,als,inicial,durée,duree,plazo,laufzeit,tage,tagen,monate,monaten,jahre,mois,ans"

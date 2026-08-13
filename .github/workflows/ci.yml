@@ -7,6 +7,10 @@ name: CI
 # No secrets required: everything here is hermetic, with no API key and no calls
 # to Anthropic, so a green run means the same thing it means locally. What that
 # does and does not cover is written down in docs/TESTING.md.
+#
+# The steps below are the same targets `make check` runs, which the pre-commit
+# hook makes a condition of committing. They are listed separately here so a
+# failure names the stage it failed at.
 
 on:
   push:
@@ -47,8 +51,18 @@ jobs:
       - name: make lint
         run: make lint
 
-      - name: make test
-        run: make test
+      # Coverage rather than a bare run: the floor in pyproject.toml only means
+      # something if something enforces it, and a floor a human has to remember
+      # to type is not a floor.
+      - name: make coverage
+        run: make coverage
+
+      # The checks that do not answer to anyone's judgement: layering contracts,
+      # dead code, complexity, security, dependency hygiene, spelling and known
+      # vulnerabilities. Declaring these tools and never running them is how a
+      # pyproject comment claiming "a contract here fails the build" became false.
+      - name: make audit
+        run: make audit
 
       # The corpus is kept as text and rendered to PDF, so the renderer has to
       # keep working: the behaviour check below runs on its output.
@@ -66,6 +80,14 @@ jobs:
       # be able to fail this workflow. Run `make corpus && make triage` locally.
       - name: Classify every document (free, no API key)
         run: make triage
+
+      # The other half, and the one the free gates used to miss entirely: take
+      # every clause in every real document that states a term, and assert that
+      # a model quoting that clause for that number is believed. Every
+      # verification defect this project has had was a false accusation against
+      # ordinary drafting, invisible to a suite of invented examples.
+      - name: Verify quotes against the real corpus (free, no API key)
+        run: make verify
 
       # Two startup invariants that turn a silent stall into a crash: every
       # stage hands off to the next, and the models match the database on disk.
