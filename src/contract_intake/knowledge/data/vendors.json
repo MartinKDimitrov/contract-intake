@@ -4,7 +4,12 @@
     {
       "id": "VEN-0142",
       "legal_name": "Nordwind Logistik GmbH",
-      "aliases": ["Nordwind Logistik", "NordWind Logistics", "Nordwind Freight", "NWL GmbH"],
+      "aliases": [
+        "Nordwind Logistik",
+        "NordWind Logistics",
+        "Nordwind Freight",
+        "NWL GmbH"
+      ],
       "registration_id": "HRB 84421",
       "country": "DE",
       "category": "freight_forwarding",
@@ -15,7 +20,10 @@
     {
       "id": "VEN-0207",
       "legal_name": "Kestrel Analytics Ltd",
-      "aliases": ["Kestrel Analytics", "Kestrel Data"],
+      "aliases": [
+        "Kestrel Analytics",
+        "Kestrel Data"
+      ],
       "registration_id": "09912447",
       "country": "GB",
       "category": "data_analytics",
@@ -26,7 +34,10 @@
     {
       "id": "VEN-0033",
       "legal_name": "Balkan Steel Trading EOOD",
-      "aliases": ["Balkan Steel", "BST EOOD"],
+      "aliases": [
+        "Balkan Steel",
+        "BST EOOD"
+      ],
       "registration_id": "203441882",
       "country": "BG",
       "category": "raw_materials",
@@ -36,7 +47,10 @@
     {
       "id": "VEN-0088",
       "legal_name": "Helvetia Rail Components AG",
-      "aliases": ["Helvetia Rail", "HRC AG"],
+      "aliases": [
+        "Helvetia Rail",
+        "HRC AG"
+      ],
       "registration_id": "CHE-114.882.301",
       "country": "CH",
       "category": "rolling_stock",
@@ -46,7 +60,10 @@
     {
       "id": "VEN-0119",
       "legal_name": "Danube Track Services Kft",
-      "aliases": ["Danube Track", "DTS Kft"],
+      "aliases": [
+        "Danube Track",
+        "DTS Kft"
+      ],
       "registration_id": "01-09-884412",
       "country": "HU",
       "category": "maintenance",
@@ -56,7 +73,10 @@
     {
       "id": "VEN-0156",
       "legal_name": "Aurora Facility Management SRL",
-      "aliases": ["Aurora FM", "Aurora Facilities"],
+      "aliases": [
+        "Aurora FM",
+        "Aurora Facilities"
+      ],
       "registration_id": "J40/2214/2019",
       "country": "RO",
       "category": "facilities",
@@ -66,7 +86,10 @@
     {
       "id": "VEN-0164",
       "legal_name": "Meridian IT Solutions DOO",
-      "aliases": ["Meridian IT", "MITS DOO"],
+      "aliases": [
+        "Meridian IT",
+        "MITS DOO"
+      ],
       "registration_id": "21447882",
       "country": "RS",
       "category": "it_services",
@@ -77,7 +100,10 @@
     {
       "id": "VEN-0171",
       "legal_name": "Vistula Cargo Sp. z o.o.",
-      "aliases": ["Vistula Cargo", "Vistula Logistics"],
+      "aliases": [
+        "Vistula Cargo",
+        "Vistula Logistics"
+      ],
       "registration_id": "0000441882",
       "country": "PL",
       "category": "freight_forwarding",
@@ -87,7 +113,10 @@
     {
       "id": "VEN-0188",
       "legal_name": "Adriatic Marine Insurance Ltd",
-      "aliases": ["Adriatic Marine", "AMI Ltd"],
+      "aliases": [
+        "Adriatic Marine",
+        "AMI Ltd"
+      ],
       "registration_id": "12447901",
       "country": "MT",
       "category": "insurance",
@@ -97,7 +126,10 @@
     {
       "id": "VEN-0195",
       "legal_name": "Carpathian Energy Supply AD",
-      "aliases": ["Carpathian Energy", "CES AD"],
+      "aliases": [
+        "Carpathian Energy",
+        "CES AD"
+      ],
       "registration_id": "204118872",
       "country": "BG",
       "category": "utilities",
@@ -107,7 +139,10 @@
     {
       "id": "VEN-0212",
       "legal_name": "Northgate Security Services Ltd",
-      "aliases": ["Northgate Security", "NSS"],
+      "aliases": [
+        "Northgate Security",
+        "NSS"
+      ],
       "registration_id": "07741220",
       "country": "GB",
       "category": "security",
@@ -117,7 +152,10 @@
     {
       "id": "VEN-0229",
       "legal_name": "Lumen Print & Media BV",
-      "aliases": ["Lumen Print", "Lumen Media"],
+      "aliases": [
+        "Lumen Print",
+        "Lumen Media"
+      ],
       "registration_id": "68441290",
       "country": "NL",
       "category": "print",
@@ -127,7 +165,10 @@
     {
       "id": "VEN-0241",
       "legal_name": "Sofia Legal Partners OOD",
-      "aliases": ["Sofia Legal", "SLP OOD"],
+      "aliases": [
+        "Sofia Legal",
+        "SLP OOD"
+      ],
       "registration_id": "201884471",
       "country": "BG",
       "category": "professional_services",
@@ -137,7 +178,10 @@
     {
       "id": "VEN-0258",
       "legal_name": "Thames Consulting Group Ltd",
-      "aliases": ["Thames Consulting", "TCG"],
+      "aliases": [
+        "Thames Consulting",
+        "TCG"
+      ],
       "registration_id": "08814472",
       "country": "GB",
       "category": "consulting",
@@ -147,7 +191,10 @@
     {
       "id": "VEN-0263",
       "legal_name": "Iberia Rolling Stock SA",
-      "aliases": ["Iberia Rolling Stock", "IRS SA"],
+      "aliases": [
+        "Iberia Rolling Stock",
+        "IRS SA"
+      ],
       "registration_id": "A-88441207",
       "country": "ES",
       "category": "rolling_stock",
@@ -157,7 +204,10 @@
     {
       "id": "VEN-0277",
       "legal_name": "Baltic Fuel Terminals UAB",
-      "aliases": ["Baltic Fuel", "BFT UAB"],
+      "aliases": [
+        "Baltic Fuel",
+        "BFT UAB"
+      ],
       "registration_id": "302441882",
       "country": "LT",
       "category": "fuel",
@@ -167,7 +217,10 @@
     {
       "id": "VEN-0284",
       "legal_name": "Alpine Signalling Technik GmbH",
-      "aliases": ["Alpine Signalling", "AST GmbH"],
+      "aliases": [
+        "Alpine Signalling",
+        "AST GmbH"
+      ],
       "registration_id": "FN 441882k",
       "country": "AT",
       "category": "signalling",
@@ -177,7 +230,10 @@
     {
       "id": "VEN-0291",
       "legal_name": "Levant Shipping Agency SAL",
-      "aliases": ["Levant Shipping", "LSA SAL"],
+      "aliases": [
+        "Levant Shipping",
+        "LSA SAL"
+      ],
       "registration_id": "1004417",
       "country": "LB",
       "category": "shipping",
@@ -188,7 +244,10 @@
     {
       "id": "VEN-0304",
       "legal_name": "Rhine Valley Catering GmbH",
-      "aliases": ["Rhine Valley Catering", "RVC"],
+      "aliases": [
+        "Rhine Valley Catering",
+        "RVC"
+      ],
       "registration_id": "HRB 118872",
       "country": "DE",
       "category": "catering",
@@ -198,13 +257,29 @@
     {
       "id": "VEN-0318",
       "legal_name": "Nordwind Marine Services AS",
-      "aliases": ["Nordwind Marine", "NMS AS"],
+      "aliases": [
+        "Nordwind Marine",
+        "NMS AS"
+      ],
       "registration_id": "918 441 882",
       "country": "NO",
       "category": "shipping",
       "risk_class": "standard",
       "status": "approved",
       "notes": "Unrelated to Nordwind Logistik GmbH despite the shared first word -- a deliberate near-collision for matching."
+    },
+    {
+      "id": "VEN-0401",
+      "legal_name": "Kestrel Rail Services Ltd",
+      "aliases": [
+        "Kestrel Rail"
+      ],
+      "registration_id": "GB 09912447",
+      "country": "GB",
+      "category": "maintenance",
+      "risk_class": "medium",
+      "status": "under_review",
+      "notes": "Ownership change under review by Procurement. Not approved to contract with."
     }
   ]
 }

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from contract_intake.extract.schema import REQUIRED_FOR_AUTO_APPROVAL
+from contract_intake.extract.schema import DECISION_BEARING, REQUIRED_FOR_AUTO_APPROVAL
 from contract_intake.policy.rules import ALL_RULES, Evidence, decide
 from contract_intake.status import Route
 
@@ -22,8 +22,13 @@ def extraction(**overrides) -> dict:
             {"field": name, "status": "verified"} for name in REQUIRED_FOR_AUTO_APPROVAL
         ],
     }
-    for name in REQUIRED_FOR_AUTO_APPROVAL:
+    # Every field a decision rests on, not only the five required ones. Built
+    # from REQUIRED_FOR_AUTO_APPROVAL alone, this fixture made the confidence
+    # floor and the provenance rule untestable in exactly the half that matters
+    # -- the liability cap, the renewal flag and the data-processing agreement.
+    for name in DECISION_BEARING:
         base[name] = {"value": "x", "confidence": 0.95, "source_quote": "q", "page": 1}
+    base["_provenance"] = [{"field": name, "status": "verified"} for name in DECISION_BEARING]
     return base | overrides
 
 
@@ -254,3 +259,63 @@ def test_the_confidence_floor_is_configurable(settings) -> None:
 def test_an_empty_extraction_does_not_crash(settings) -> None:
     decision = decide(Evidence(extraction={}), settings)
     assert decision.route is Route.NEEDS_REVIEW
+
+
+def test_every_rule_has_a_place_in_the_review_queue() -> None:
+    """Two orderings of one list, in two files, are one edit from disagreeing.
+
+    They did. `rule_partially_unverifiable` -- the rule that stops a liability
+    cap read off a photograph reaching auto-approval -- fell into the unranked
+    bucket and sorted below everything in the queue it was written for.
+    """
+    import re
+    from pathlib import Path
+
+    from contract_intake.policy import rules as rules_module
+
+    source = Path(rules_module.__file__).read_text(encoding="utf-8")
+    emitted = set(re.findall(r'rule="(\w+)"', source))
+
+    review = Path(rules_module.__file__).parents[1] / "web" / "review.py"
+    ranked = set(re.findall(r'"(\w+)": \d', review.read_text(encoding="utf-8")))
+
+    assert not emitted - ranked, f"rules with no queue rank: {sorted(emitted - ranked)}"
+
+
+@pytest.mark.parametrize("status", ["under_review", "terminated", "blocked", "unknown"])
+def test_only_an_approved_counterparty_passes(settings, status: str) -> None:
+    """The rule reads as an allow-list; the registry had two statuses, so nothing checked.
+
+    Its docstring already claims this ("the registry is free to grow a status
+    -- 'under_review', 'terminated', 'blocked' -- and every one of those used to
+    auto-approve"). A mutation back to `!= "suspended"` passed the whole suite.
+    """
+    decision = decide(clean(counterparty_status=status), settings)
+
+    assert decision.route is Route.NEEDS_REVIEW, status
+    assert "suspended_counterparty" in [r.rule for r in decision.reasons]
+
+
+def test_a_weak_liability_cap_blocks_even_though_it_is_not_a_required_field(settings) -> None:
+    """DECISION_BEARING is wider than REQUIRED_FOR_AUTO_APPROVAL for this reason."""
+    weak = extraction()
+    weak["liability_cap"] = {"value": 500_000, "confidence": 0.01, "source_quote": "q", "page": 1}
+
+    decision = decide(clean(extraction=weak), settings)
+
+    assert decision.route is Route.NEEDS_REVIEW
+    assert "liability_cap" in decision.blocking_fields
+
+
+def test_an_unverifiable_data_protection_clause_blocks(settings) -> None:
+    """A value read off a photograph is not evidence, required field or not."""
+    scanned = extraction()
+    scanned["_provenance"] = [
+        {"field": name, "status": "unverifiable" if name == "dpa_present" else "verified"}
+        for name in DECISION_BEARING
+    ]
+
+    decision = decide(clean(extraction=scanned), settings)
+
+    assert decision.route is Route.NEEDS_REVIEW
+    assert "partially_unverifiable" in [r.rule for r in decision.reasons]

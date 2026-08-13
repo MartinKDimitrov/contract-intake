@@ -47,7 +47,8 @@
       "op": "gte",
       "limit": 250000,
       "severity": "high",
-      "message": "liability cap of {value} is below the {limit} minimum"
+      "message": "liability cap of {value} is below the {limit} minimum",
+      "absent_ok": true
     },
     {
       "id": "liability_cap_present",
@@ -101,8 +102,7 @@
         "professional_services"
       ],
       "severity": "high",
-      "message": "no data processing agreement, and this supplier's category is presumed to process personal data",
-      "absent_fails": true
+      "message": "no data processing agreement, and this supplier's category is presumed to process personal data"
     },
     {
       "id": "effective_date_present",
@@ -125,7 +125,8 @@
         "CHF"
       ],
       "severity": "high",
-      "message": "the liability cap states no ISO 4217 currency, so its size cannot be judged"
+      "message": "the liability cap states no ISO 4217 currency, so its size cannot be judged",
+      "absent_ok": true
     },
     {
       "id": "liability_not_excluded",

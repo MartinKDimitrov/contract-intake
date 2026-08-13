@@ -297,7 +297,7 @@ def test_a_compliant_contract_produces_nothing() -> None:
     assert evaluate(fields(), vendor_category="freight_forwarding") == []
 
 
-def test_an_unparseable_number_fires_its_range_check() -> None:
+def test_an_unparsable_number_fires_its_range_check() -> None:
     """A value the checker cannot parse is a value it did not check."""
     found = evaluate(fields(payment_terms_days="thirty days"))
     assert [f["field"] for f in found] == ["payment_terms_days"]
@@ -315,3 +315,41 @@ def test_an_unknown_operator_is_a_loading_error_not_a_silent_pass() -> None:
 
     with pytest.raises(UnknownOperatorError, match="teleports"):
         load_checks(path)
+
+
+#: The schema asks the model to record the governing law *as stated*, and
+#: contracts state it adjectivally. Before the alias table the model was in a
+#: double bind: quote the page faithfully and fail the allow-list, or normalise
+#: to a country noun and fail quote verification.
+AS_STATED = [
+    ("English law", []),
+    ("the laws of England and Wales", []),
+    ("German law", []),
+    ("deutschem Recht", []),
+    ("Austrian law", []),
+    ("Bulgarian law", []),
+    ("the laws of the Republic of Bulgaria", []),
+    ("la legislación española", ["§4.1"]),
+    ("le droit français", ["§4.1"]),
+    ("New South Wales, Australia", ["§4.1"]),
+    ("Cayman Islands law", ["§4.1", "§4.1"]),
+]
+
+
+@pytest.mark.parametrize(("stated", "citations"), AS_STATED)
+def test_a_jurisdiction_is_judged_however_it_is_written(stated: str, citations: list) -> None:
+    found = [f["citation"] for f in evaluate(fields(governing_law=stated))]
+    assert found == citations, stated
+
+
+def test_a_missing_liability_cap_is_one_finding_not_three() -> None:
+    """Three high findings for one absent figure is noise -- and worse.
+
+    Stage 05 calls the agent only when the deterministic checks are silent, so
+    duplicate findings for a single missing value suppressed the paid review
+    that might have explained it. Section 3.2 owns absence; the floor and the
+    currency check declare `absent_ok`.
+    """
+    found = [f for f in evaluate(fields(liability_cap=None)) if f["field"] == "liability_cap"]
+
+    assert [f["citation"] for f in found] == ["§3.2"]

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from contract_intake.config import Settings
-from contract_intake.extract.schema import DECISION_BEARING
+from contract_intake.extract.schema import DECISION_BEARING, REQUIRED_FOR_AUTO_APPROVAL
 from contract_intake.status import Route
 
 RULES_VERSION = 1
@@ -87,9 +87,13 @@ class Evidence:
 
 # -- the rules --------------------------------------------------------------
 #
-# Each takes the evidence and returns the reasons it found, or nothing. Order in
-# ALL_RULES is presentation order in the review queue, not precedence: every
+# Each takes the evidence and returns the reasons it found, or nothing. Every
 # rule runs, so a reviewer sees all the problems at once rather than the first.
+#
+# Order here is execution order and nothing else. The queue sorts by its own
+# table in web/review.py:_reason_weight, which a test keeps in step with the
+# rule names emitted below -- two orderings of one list, in two packages, and
+# this comment used to claim they were the same one.
 
 
 #: The severities the agent is allowed to emit. Anything outside this set is
@@ -192,7 +196,36 @@ def rule_suspended_counterparty(ev: Evidence, _s: Settings) -> list[Reason]:
     ]
 
 
+def rule_missing_required_fields(ev: Evidence, _s: Settings) -> list[Reason]:
+    """A contract record with a hole in it is not a contract record.
+
+    ARCHITECTURE.md has always said these five must be *present* before a
+    document can pass without a human. Nothing enforced it. The confidence rule
+    below looked like it did -- an absent value is extracted with confidence
+    zero -- until a guard was added there to stop absent fields being reported
+    twice, at which point an extraction with all five missing auto-approved in
+    silence.
+
+    Presence and confidence are separate questions and now have separate rules.
+    """
+    missing = [name for name in REQUIRED_FOR_AUTO_APPROVAL if ev.field(name).get("value") is None]
+    if not missing:
+        return []
+    return [
+        Reason(
+            rule="missing_required_field",
+            message=f"the document does not state: {', '.join(missing)}",
+            fields=tuple(missing),
+        )
+    ]
+
+
 def rule_low_confidence_required_fields(ev: Evidence, s: Settings) -> list[Reason]:
+    """Present, but not confidently enough to decide on.
+
+    Absent fields are skipped here and caught by the rule above, so that a
+    document missing a term is reported once rather than twice.
+    """
     weak = [
         name
         for name in DECISION_BEARING
@@ -307,6 +340,7 @@ ALL_RULES: tuple[Callable[[Evidence, Settings], list[Reason]], ...] = (
     rule_medium_severity_findings,
     rule_low_severity_findings,
     rule_unsupported_quotes,
+    rule_missing_required_fields,
     rule_low_confidence_required_fields,
     rule_wholly_unverifiable,
 )

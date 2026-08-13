@@ -3,7 +3,7 @@
 Deliberately *not* embeddings. Company names fail in ways that are lexical, not
 semantic: a scan reads "NordWind Logistics Ltd." where the registry holds
 "Nordwind Logistik GmbH", a subsidiary signs under a trading name, a legal form
-changes from EOOD to AD. Trigram similarity handles all of that; a dense
+changes from EOOD to AD. Token-sorted edit distance handles all of that; a dense
 retriever would happily rank "Nordwind Marine Services AS" alongside "Nordwind
 Logistik GmbH" because both are Nordic shipping companies -- which is exactly
 the mistake that must not be made.

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
@@ -35,6 +36,38 @@ class UnknownOperatorError(ValueError):
     """A check names an operator this module cannot evaluate."""
 
 
+#: How a jurisdiction is actually written, mapped to the name the allow-list
+#: uses. The schema asks the model to record the governing law *as stated*, and
+#: contracts state it adjectivally -- "English law", "deutschem Recht", "la
+#: legislación española". Without this the model was in a double bind: quote the
+#: document faithfully and fail the allow-list, or normalise to a country noun
+#: and fail quote verification.
+_JURISDICTION_ALIASES = {
+    "english law": "england & wales",
+    "english": "england & wales",
+    "law of england": "england & wales",
+    "laws of england": "england & wales",
+    "german law": "germany",
+    "german": "germany",
+    "deutsches recht": "germany",
+    "deutschem recht": "germany",
+    "federal republic of germany": "germany",
+    "austrian law": "austria",
+    "austrian": "austria",
+    "osterreichisches recht": "austria",
+    "dutch law": "netherlands",
+    "dutch": "netherlands",
+    "the netherlands": "netherlands",
+    "bulgarian law": "bulgaria",
+    "bulgarian": "bulgaria",
+    "spanish law": "spain",
+    "spanish": "spain",
+    "legislacion espanola": "spain",
+    "french law": "france",
+    "french": "france",
+    "droit francais": "france",
+}
+
 #: Leading noise that varies without changing which jurisdiction is meant.
 #: Applied before comparing a governing law against the allow-list.
 _JURISDICTION_NOISE = (
@@ -45,6 +78,14 @@ _JURISDICTION_NOISE = (
     "the republic of ",
     "republic of ",
     "the ",
+    # Articles, because the law is stated in its own language: "la legislación
+    # española", "le droit français", "das deutsche Recht".
+    "la ",
+    "el ",
+    "le ",
+    "der ",
+    "das ",
+    "die ",
 )
 
 
@@ -150,11 +191,31 @@ def canonical_jurisdiction(value: str) -> str:
     a rendering this does not recognise becomes a deviation and goes to a
     person, which is the right direction to be wrong in for a jurisdiction.
     """
-    text = " ".join(str(value).casefold().split()).strip(" .,;")
+    folded = unicodedata.normalize("NFKD", str(value).casefold())
+    text = " ".join("".join(c for c in folded if not unicodedata.combining(c)).split())
+    text = text.strip(" .,;")
     for prefix in _JURISDICTION_NOISE:
         if text.startswith(prefix):
             text = text[len(prefix) :]
-    return text.replace(" and ", " & ").strip()
+    text = text.replace(" and ", " & ").strip(" .,;")
+    return _JURISDICTION_ALIASES.get(text, text)
+
+
+def phrasings_for(value: str) -> set[str]:
+    """Every way this jurisdiction is written, including the value itself.
+
+    The alias table exists so a contract can say "English law" and still clear an
+    allow-list that reads "england & wales". Extraction needs the same knowledge
+    to decide whether a quote supports the jurisdiction beside it, so it is
+    exposed here rather than duplicated there.
+    """
+    canonical = canonical_jurisdiction(value)
+    phrasings = {value.strip(), canonical, canonical.replace(" & ", " and ")}
+    phrasings |= {alias for alias, target in _JURISDICTION_ALIASES.items() if target == canonical}
+    # A single-word adjective is not evidence of a governing law: "the English
+    # language" and "a German limited liability company" are ordinary drafting,
+    # and admitting them let any sentence support any jurisdiction.
+    return {p for p in phrasings if p and (" " in p or p == canonical)}
 
 
 def _passes(check: Check, entry: dict[str, Any]) -> bool:
@@ -164,14 +225,16 @@ def _passes(check: Check, entry: dict[str, Any]) -> bool:
     check would catch it -- but that reasoning was spread across two files and
     was wrong for §2.3, where a contract with no termination-for-convenience
     right at all sailed through a ceiling of 90 days. A check that cannot see a
-    value has not checked it, so the two places where silence is genuinely
-    acceptable now say so with `absent_ok`.
+    value has not checked it, so the places where silence is genuinely
+    acceptable say so with `absent_ok` -- including the two cap checks, because
+    §3.2 already owns absence and three high findings for one missing figure is
+    noise that also suppresses the paid agent review.
     """
     p = check.params
     value = entry.get("value")
 
     if value is None:
-        return bool(p.get("absent_ok", False)) and not p.get("absent_fails", False)
+        return bool(p.get("absent_ok", False))
 
     match check.op:
         case "required":
