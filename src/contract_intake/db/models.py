@@ -100,7 +100,10 @@ class Document(Base):
     text_pages: Mapped[int] = mapped_column(Integer, default=0)
     image_pages: Mapped[int] = mapped_column(Integer, default=0)
     pages: Mapped[list[Any]] = mapped_column(default=list)
-    redactions: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    #: Masked items by category, or NULL when masking did not run. The
+    #: distinction matters: an empty dict means the document was clean, NULL
+    #: means nothing looked.
+    redactions: Mapped[dict[str, Any] | None] = mapped_column(default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

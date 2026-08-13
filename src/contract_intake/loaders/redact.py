@@ -20,12 +20,24 @@ What is *not* redacted is as deliberate as what is. ``signatories`` and
 names and company registration, VAT and UIC numbers must survive. A company
 identifier is not personal data; a natural person's identifier is.
 
-Every category is *validated*, not merely matched. A nine-digit Bulgarian UIC
-and a ten-digit personal number are both runs of digits, and pattern-matching
-alone would mask the field the extraction depends on. A checksum tells them
-apart, and the cost of being wrong is asymmetric: masking a required field
-silently degrades extraction, while missing a rare exotic identifier leaves us
-where every system without redaction already is.
+Two rules keep it from doing more harm than good, and both were learned by
+measuring rather than by reasoning:
+
+**Validated, not merely matched.** Every candidate goes through the real
+checksum -- IBAN mod-97 with the country's own length, the Bulgarian weighted
+sum, the French key, the Spanish check letter.
+
+**Personal identifiers are recognised only beside a label.** Checksums alone are
+not enough to tell a person's number from a company's, because the schemes were
+never designed to be mutually exclusive: a French SIRET carries a Luhn check *by
+construction*, so treating "digits that pass Luhn" as a payment card masked every
+French company number. A 13-digit Bulgarian BULSTAT clears Luhn one time in ten,
+and any 15-digit run satisfies the French social-security key one time in 97.
+
+That trade is deliberate and one-directional. An unlabelled identifier is missed,
+which leaves us exactly where a system without redaction already is. A mislabelled
+company number would silently destroy ``counterparty_registration_id`` -- a field
+this pipeline extracts, decides on, and reports as verified.
 
 Scanned pages are the honest gap. They go to the model as images and nothing
 here can see them -- see the limitation noted in the module's tests and in
@@ -49,18 +61,152 @@ MASK: Final = {
     "phone": "[PHONE]",
 }
 
-_EMAIL = re.compile(r"\b[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}\b")
-_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,3})?\b")
-_DIGIT_RUN = re.compile(r"\b\d[\d ]{8,21}\d\b")
-_DNI = re.compile(r"\b(\d{8})[- ]?([A-Za-z])\b")
-_NIE = re.compile(r"\b([XYZxyz])[- ]?(\d{7})[- ]?([A-Za-z])\b")
-#: International format only. A local-format number is indistinguishable from a
-#: clause reference or an amount, and a false positive here is expensive.
-_PHONE = re.compile(r"\+\d[\d\-() ]{7,17}\d\b")
+# --- what may be recognised on its own, and what may not --------------------
+#
+# An IBAN and an email address carry their own structure: a country prefix and
+# a mod-97 checksum, an @ and a domain. Nothing else in a contract looks like
+# them, so they are matched wherever they appear.
+#
+# Everything else is a bare run of digits, and a contract is full of those --
+# company registration numbers, order references, article numbers, amounts,
+# schedules. Checksums do not separate them: a French SIRET carries a Luhn
+# check *by construction*, so using Luhn as a card detector masked every French
+# company number as a payment card. A Bulgarian 13-digit BULSTAT passes Luhn
+# one time in ten, and any 15-digit run satisfies the French social-security
+# key one time in 97.
+#
+# So the personal identifiers are recognised only beside a label. That trades
+# recall for precision deliberately: an unlabelled identifier is missed, which
+# leaves us where a system with no redaction already is, while a mislabelled
+# company number would silently destroy `counterparty_registration_id` -- a
+# field this pipeline extracts and decides on.
+
+_EMAIL = re.compile(r"[\w.%+-]+@[\w.-]+\.[A-Za-z]{2,}")
+_IBAN = re.compile(r"\b[A-Za-z]{2}\d{2}[ -]?(?:[A-Za-z0-9]{4}[ -]?){2,7}[A-Za-z0-9]{1,4}\b")
+
+#: ``label , up to a little punctuation , number`` -- the number is group 1 so
+#: the label survives into the masked text and the reviewer can still see what
+#: kind of thing was removed.
+_LABELLED = "(?i)(?:{labels})\\s*(?:n[o°º.]|number|№|:|\\.|-)?\\s*({number})"
+
+_ID_LABELS = (
+    r"егн|бул\s*егн|eгн|egn"  # Bulgarian personal number
+    r"|dni|nif|nie"  # Spanish
+    r"|nir|s[ée]curit[ée]\s+sociale|num[ée]ro\s+de\s+s[ée]cu\w*"  # French
+    r"|national\s+id|personal\s+(?:id|number)|id\s+number"
+)
+_CARD_LABELS = r"card|carte|karte|tarjeta|карта|pan|visa|mastercard|maestro|amex|american\s+express"
+_PHONE_LABELS = (
+    r"tel|t[ée]l|tlf|phone|telephone|t[ée]l[ée]phone|telefon|tel[ée]fono|тел(?:ефон)?"
+    r"|mobile|mobil|m[óo]vil|gsm|fax|handy"
+)
+
+#: Exact shapes, not ranges. A range of 13-19 digits is what let a 14-digit
+#: SIRET and a 13-digit BULSTAT be read as payment cards.
+_EGN_SHAPE = r"\d{10}"
+_NIR_SHAPE = r"\d(?:[ .]?\d){14}"
+_CARD_SHAPE = r"\d{4}(?:[ -]?\d{4}){3}"
+_DNI_SHAPE = r"\d{8}[- ]?[A-Za-z]"
+_NIE_SHAPE = r"[XYZxyz][- ]?\d{7}[- ]?[A-Za-z]"
+_PHONE_SHAPE = r"\+?\d[\d\-()/ ]{6,18}\d"
+
+_LABELLED_ID = re.compile(
+    _LABELLED.format(
+        labels=_ID_LABELS,
+        number=f"{_NIR_SHAPE}|{_NIE_SHAPE}|{_DNI_SHAPE}|{_EGN_SHAPE}",
+    )
+)
+_LABELLED_CARD = re.compile(_LABELLED.format(labels=_CARD_LABELS, number=_CARD_SHAPE))
+_LABELLED_PHONE = re.compile(_LABELLED.format(labels=_PHONE_LABELS, number=_PHONE_SHAPE))
+
+#: IBAN length by country, from the SWIFT registry. A country absent from this
+#: table is not treated as an IBAN at all -- the failure is then a miss, not the
+#: destruction of a company identifier.
+IBAN_LENGTHS: Final = {
+    "AD": 24,
+    "AE": 23,
+    "AL": 28,
+    "AT": 20,
+    "AZ": 28,
+    "BA": 20,
+    "BE": 16,
+    "BG": 22,
+    "BH": 22,
+    "BR": 29,
+    "BY": 28,
+    "CH": 21,
+    "CR": 22,
+    "CY": 28,
+    "CZ": 24,
+    "DE": 22,
+    "DK": 18,
+    "DO": 28,
+    "EE": 20,
+    "EG": 29,
+    "ES": 24,
+    "FI": 18,
+    "FO": 18,
+    "FR": 27,
+    "GB": 22,
+    "GE": 22,
+    "GI": 23,
+    "GL": 18,
+    "GR": 27,
+    "GT": 28,
+    "HR": 21,
+    "HU": 28,
+    "IE": 22,
+    "IL": 23,
+    "IS": 26,
+    "IT": 27,
+    "JO": 30,
+    "KW": 30,
+    "KZ": 20,
+    "LB": 28,
+    "LC": 32,
+    "LI": 21,
+    "LT": 20,
+    "LU": 20,
+    "LV": 21,
+    "MC": 27,
+    "MD": 24,
+    "ME": 22,
+    "MK": 19,
+    "MR": 27,
+    "MT": 31,
+    "MU": 30,
+    "NL": 18,
+    "NO": 15,
+    "PK": 24,
+    "PL": 28,
+    "PS": 29,
+    "PT": 25,
+    "QA": 29,
+    "RO": 24,
+    "RS": 22,
+    "SA": 24,
+    "SE": 24,
+    "SI": 19,
+    "SK": 24,
+    "SM": 27,
+    "TN": 24,
+    "TR": 26,
+    "UA": 29,
+    "VA": 22,
+    "VG": 24,
+    "XK": 20,
+}
 
 _DNI_LETTERS: Final = "TRWAGMYFPDXBNJZSQVHLCKE"
 #: Bulgarian personal number weights, per the civil registration act.
 _EGN_WEIGHTS: Final = (2, 4, 8, 5, 10, 9, 7, 3, 6)
+
+#: PDF text extraction emits these instead of a plain space, and a pattern
+#: written with a literal space silently stops matching. The verifier in
+#: ``extract/extractor.py`` already normalises for the same reason; the
+#: redactor did not, so a real IBAN broken by non-breaking spaces went to the
+#: model untouched.
+_INVISIBLE = str.maketrans({"\xa0": " ", "\u202f": " ", "\u2007": " ", "\u00ad": "", "\u200b": ""})
 
 
 def _mod97(value: str) -> int:
@@ -70,8 +216,17 @@ def _mod97(value: str) -> int:
 
 
 def is_iban(candidate: str) -> bool:
-    stripped = candidate.replace(" ", "").upper()
-    if not 15 <= len(stripped) <= 34 or not stripped[:2].isalpha():
+    """Country prefix, the length that country actually uses, then mod-97.
+
+    The length table is not decoration. Without it a Bulgarian VAT number --
+    ``BG`` followed by digits, fifteen characters -- clears mod-97 one time in
+    ninety-seven and is masked as a bank account, and VAT numbers are what
+    ``counterparty_registration_id`` is often made of.
+    """
+    stripped = "".join(c for c in candidate.upper() if c.isalnum())
+    if not (stripped[:2].isalpha() and stripped[2:4].isdigit()):
+        return False
+    if IBAN_LENGTHS.get(stripped[:2]) != len(stripped):
         return False
     return _mod97(stripped[4:] + stripped[:4]) == 1
 
@@ -133,56 +288,67 @@ def redact(text: str) -> tuple[str, dict[str, int]]:
     if not text:
         return text, {}
 
+    # Do this first, or every pattern below silently stops matching on text that
+    # came out of a PDF.
+    text = text.translate(_INVISIBLE)
     found: Counter[str] = Counter()
 
-    def swap(category: str) -> Callable[[re.Match[str]], str]:
+    def mask_group(category: str, validator: Callable[[str], bool]) -> Callable[..., str]:
         def _replace(match: re.Match[str]) -> str:
+            number = match.group(1)
+            if not validator(number):
+                return match.group(0)
+            found[category] += 1
+            return match.group(0).replace(number, MASK[category])
+
+        return _replace
+
+    def whole_match(category: str, validator: Callable[[str], bool]) -> Callable[..., str]:
+        def _replace(match: re.Match[str]) -> str:
+            if not validator(match.group(0)):
+                return match.group(0)
             found[category] += 1
             return MASK[category]
 
         return _replace
 
-    def iban(match: re.Match[str]) -> str:
-        if not is_iban(match.group(0)):
-            return match.group(0)
-        found["iban"] += 1
-        return MASK["iban"]
+    def any_national_id(candidate: str) -> bool:
+        compact = candidate.replace(" ", "").replace(".", "").replace("-", "")
+        if compact[:1].isalpha():
+            return is_nie(candidate)
+        if compact[-1:].isalpha():
+            return is_dni(candidate)
+        return is_nir(compact) or is_egn(compact)
 
-    def digit_run(match: re.Match[str]) -> str:
-        raw = match.group(0)
-        digits = raw.replace(" ", "")
-        if is_nir(digits) or is_egn(digits):
-            found["national_id"] += 1
-            return MASK["national_id"]
-        if is_luhn(digits):
-            found["card"] += 1
-            return MASK["card"]
-        return raw
-
-    def spanish_id(match: re.Match[str]) -> str:
-        groups = match.groups()
-        if len(groups) == 2:
-            number, letter = groups
-        else:
-            prefix, digits, letter = groups
-            number = str("XYZ".index(prefix.upper())) + digits
-        if letter.upper() != _dni_letter(int(number)):
-            return match.group(0)
-        found["national_id"] += 1
-        return MASK["national_id"]
-
-    # Order matters. Email first, because an address can contain digit runs a
-    # later rule would eat. Phone before the generic digit run, so that a number
-    # which happens to satisfy Luhn is labelled a phone rather than a card --
-    # both are masked either way, but the category is shown to a reviewer.
-    text = _EMAIL.sub(swap("email"), text)
-    text = _IBAN.sub(iban, text)
-    text = _PHONE.sub(swap("phone"), text)
-    text = _NIE.sub(spanish_id, text)
-    text = _DNI.sub(spanish_id, text)
-    text = _DIGIT_RUN.sub(digit_run, text)
+    # Email first: an address can contain digit runs a later rule would eat.
+    text = _EMAIL.sub(whole_match("email", lambda _c: True), text)
+    text = _IBAN.sub(whole_match("iban", is_iban), text)
+    text = _LABELLED_ID.sub(mask_group("national_id", any_national_id), text)
+    text = _LABELLED_CARD.sub(mask_group("card", lambda c: is_luhn(_digits(c))), text)
+    text = _LABELLED_PHONE.sub(mask_group("phone", lambda c: 7 <= len(_digits(c)) <= 15), text)
 
     return text, dict(found)
 
 
-__all__ = ["MASK", "is_egn", "is_iban", "is_luhn", "is_nir", "redact"]
+def _digits(text: str) -> str:
+    return "".join(c for c in text if c.isdigit())
+
+
+def is_dni(candidate: str) -> bool:
+    compact = candidate.replace(" ", "").replace("-", "")
+    if len(compact) != 9 or not compact[:8].isdigit() or not compact[8].isalpha():
+        return False
+    return compact[8].upper() == _dni_letter(int(compact[:8]))
+
+
+def is_nie(candidate: str) -> bool:
+    compact = candidate.replace(" ", "").replace("-", "")
+    if len(compact) != 9 or compact[0].upper() not in "XYZ":
+        return False
+    if not compact[1:8].isdigit() or not compact[8].isalpha():
+        return False
+    number = str("XYZ".index(compact[0].upper())) + compact[1:8]
+    return compact[8].upper() == _dni_letter(int(number))
+
+
+__all__ = ["MASK", "is_dni", "is_egn", "is_iban", "is_luhn", "is_nie", "is_nir", "redact"]

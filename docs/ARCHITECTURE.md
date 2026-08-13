@@ -1,7 +1,8 @@
 # Architecture
 
 Decisions and the alternatives they beat live in [TRADEOFFS.md](TRADEOFFS.md);
-what it costs and why in [COST_MODEL.md](COST_MODEL.md); how to run and extend it
+what it costs and why in [COST_MODEL.md](COST_MODEL.md); what is checked and what
+a green run does not prove in [TESTING.md](TESTING.md); how to run and extend it
 in [HAND_OVER.md](HAND_OVER.md).
 
 ## The shape
@@ -211,6 +212,7 @@ make run       # review UI, /healthz, /metrics/costs
 make poll      # IMAP poller + pipeline worker
 make stage N=04 ID=17
 make triage    # classify every document, by provenance, free
+make test      # 309 tests, hermetic -- see TESTING.md
 make eval      # field accuracy and knowledge-base contribution (costs money)
 make dead      # what could not be finished, and why
 ```

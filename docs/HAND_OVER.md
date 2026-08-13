@@ -109,13 +109,21 @@ start against a database that predates the models and tells you which columns
 are missing; the only remedy it can offer is to delete the database. Add Alembic
 before the first deployment that holds real contracts.
 
-**A national identifier the redactor does not know.** `loaders/redact.py`
-covers IBAN, payment cards, email, international phone numbers, and the
-Bulgarian, Spanish and French personal identity numbers. A German
-Personalausweis or a Polish PESEL passes through to the model. Adding one is a
-validator and a pattern in that file; do not add a pattern without a checksum,
-because company registration numbers look the same and one of them is an
-extracted field.
+**An identifier written without a label.** `loaders/redact.py` matches IBANs and
+email addresses wherever they appear, because they carry their own structure.
+Everything else -- national identity numbers, payment cards, phone numbers -- is
+recognised only next to a label (`ЕГН`, `DNI`, `NIE`, `NIR`, `sécurité sociale`,
+`card`, `tel`, and their translations). An unlabelled personal number reaches
+the model.
+
+That is deliberate; see TRADEOFFS.md. If you widen it, do not widen it to shape
+plus checksum alone: identifier schemes reuse each other's checksums, and the
+first version of this file masked every French SIRET as a payment card because
+SIRET is Luhn by construction. Add the label, not just the pattern.
+
+**A national scheme not on the list.** A German Personalausweis or a Polish
+PESEL passes through even when labelled. Adding one is a validator, a shape and
+a label in that file.
 
 **A scanned contract is not masked at all.** Image pages have no text layer, so
 `redact.py` cannot see them and the page reaches the model as photographed.

@@ -205,11 +205,21 @@ redactor that eats company registration numbers degrades extraction silently,
 which is worse than not redacting at all.
 
 **Cost, honestly:** coverage is a list, and a list is always incomplete -- a
-German Personalausweis or a Polish PESEL passes through today. A general PII
-model would catch more, at the price of a heavy dependency, a per-document
-latency cost, and false positives on exactly the company identifiers this must
-preserve. The narrow, checksum-verified set is the version whose failure mode
-is "missed something" rather than "broke extraction".
+German Personalausweis or a Polish PESEL passes through today, and so does any
+identifier written without a label. A general PII model would catch more, at the
+price of a heavy dependency, a per-document latency cost, and false positives on
+exactly the company identifiers this must preserve.
+
+The label requirement is the part that took a second pass to get right. The first
+version matched on shape and checksum alone, which sounds stricter and is not:
+identifier schemes reuse each other's checksums, so a French SIRET -- Luhn by
+construction -- was masked as a payment card on every French contract, and a
+Bulgarian VAT number cleared IBAN mod-97 one time in 97. Both landed on
+`counterparty_registration_id`, a field this pipeline extracts and decides on.
+Requiring a nearby label trades recall for precision in the only direction that
+is safe here: a missed identifier leaves us where a system with no redaction
+already is, while a masked company number silently degrades extraction and shows
+the reviewer `[CARD]` where a registration number should be.
 
 The real gap is scans. An image page has no text layer, so a photographed
 contract reaches the model unmasked. Closing that needs OCR, which the system

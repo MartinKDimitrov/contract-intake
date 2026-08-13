@@ -84,12 +84,12 @@ class LoadStage:
                 text_pages=document.text_pages,
                 image_pages=document.image_pages,
                 pages=document.to_json(),
-                redactions=document.redactions,
+                redactions=document.redactions if document.redacted else None,
             )
         )
         ctx.session.flush()
 
-        masked = sum(document.redactions.values())
+        masked = sum(document.redactions.values())  # empty when nothing matched
         return Advanced(
             note=(
                 f"{document.page_count} page(s): {document.text_pages} as text, "

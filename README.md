@@ -81,7 +81,8 @@ looks much like a personal one.
 
 Detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every decision that could
 have gone the other way, with the condition that would flip it, in
-[docs/TRADEOFFS.md](docs/TRADEOFFS.md). Running it in anger:
+[docs/TRADEOFFS.md](docs/TRADEOFFS.md); what is checked and what a green run does
+not prove in [docs/TESTING.md](docs/TESTING.md). Running it in anger:
 [docs/HAND_OVER.md](docs/HAND_OVER.md).
 
 ## Cost

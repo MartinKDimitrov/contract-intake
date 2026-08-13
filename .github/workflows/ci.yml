@@ -4,8 +4,9 @@ name: CI
 # pip cache proves nothing about a fresh checkout, and `make setup` is where a
 # broken environment shows up first.
 #
-# No secrets required: the suite is hermetic, with no API key and no calls to
-# Anthropic, so a green run here means the same thing it means locally.
+# No secrets required: everything here is hermetic, with no API key and no calls
+# to Anthropic, so a green run means the same thing it means locally. What that
+# does and does not cover is written down in docs/TESTING.md.
 
 on:
   push:
@@ -49,10 +50,24 @@ jobs:
       - name: make test
         run: make test
 
-      # Fixtures are generated rather than committed as binaries, so the
-      # generator has to keep working -- the eval harness runs on its output.
-      - name: Regenerate the fixtures
-        run: .venv/bin/python evals/fixtures/generate.py
+      # The corpus is kept as text and rendered to PDF, so the renderer has to
+      # keep working: the behaviour check below runs on its output.
+      - name: Render the document corpus
+        run: .venv/bin/python evals/render.py
 
-      - name: Check the pipeline chain is intact
+      # Not a unit test. This runs the real triage stage over every authored and
+      # generated document and asserts each one is classified correctly -- both
+      # the contracts that must pass and the lookalikes that must not. It costs
+      # nothing, it caught two vocabulary defects that the unit tests did not,
+      # and it is the only step here that exercises a pipeline stage end to end.
+      #
+      # The hundred collected TED notices are deliberately not fetched: that is
+      # a network call to an external service, and a flaky third party must not
+      # be able to fail this workflow. Run `make corpus && make triage` locally.
+      - name: Classify every document (free, no API key)
+        run: make triage
+
+      # Two startup invariants that turn a silent stall into a crash: every
+      # stage hands off to the next, and the models match the database on disk.
+      - name: Check the pipeline chain and schema guard
         run: .venv/bin/python -m contract_intake.cli stages

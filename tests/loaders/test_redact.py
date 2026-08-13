@@ -27,6 +27,8 @@ EXPECTED = Path(__file__).resolve().parents[2] / "evals" / "expected"
     [
         ("Paid to BG80 BNBG 9661 1020 3456 78 monthly.", "iban"),
         ("Account DE89 3704 0044 0532 0130 00 at Commerzbank.", "iban"),
+        ("iban de89370400440532013000", "iban"),
+        ("DE89-3704-0044-0532-0130-00", "iban"),
         ("Signed by I. Petrov, EGN 7523169263.", "national_id"),
         ("Numéro de sécurité sociale 1 84 12 76 451 089 46.", "national_id"),
         ("Firmado por J. Ruiz, DNI 12345678Z.", "national_id"),
@@ -34,6 +36,7 @@ EXPECTED = Path(__file__).resolve().parents[2] / "evals" / "expected"
         ("Corporate card 4111 1111 1111 1111.", "card"),
         ("Notices to ops.contact@meridia.example.com.", "email"),
         ("Contact tel. +359 888 123 456 during business hours.", "phone"),
+        ("Telefon: 040 5559 2210", "phone"),
     ],
 )
 def test_identifier_is_masked(text: str, category: str) -> None:
@@ -43,8 +46,21 @@ def test_identifier_is_masked(text: str, category: str) -> None:
 
 
 def test_counts_are_per_category() -> None:
-    _, counts = redact("EGN 7523169263 and 8001010008, IBAN BG80 BNBG 9661 1020 3456 78")
+    _, counts = redact("EGN 7523169263, EGN 8001010008, IBAN BG80 BNBG 9661 1020 3456 78")
     assert counts == {"national_id": 2, "iban": 1}
+
+
+def test_a_pdf_non_breaking_space_does_not_hide_a_bank_account() -> None:
+    """pdfplumber emits U+00A0; a pattern with a literal space stops matching.
+
+    The verifier in extract/extractor.py already normalised for this reason.
+    The redactor did not, so a real IBAN reached the model untouched -- the one
+    failure mode this module exists to prevent.
+    """
+    masked, counts = redact("IBAN:\xa0DE89\xa03704\xa00044\xa00532\xa00130\xa000")
+
+    assert counts == {"iban": 1}
+    assert MASK["iban"] in masked
 
 
 # -- what must survive ------------------------------------------------------
@@ -59,10 +75,20 @@ def test_counts_are_per_category() -> None:
     "text",
     [
         "Registered under UIC 831915840, VAT BG831915840.",
+        # A SIRET carries a Luhn check by construction, and this module used to
+        # treat "13-19 digits passing Luhn" as a payment card. Every French
+        # company number was therefore masked as [CARD] -- and the fixture that
+        # was supposed to guard against it used 85140233600018, which is not a
+        # valid SIRET, so the guard passed on a value that cannot occur.
+        "Immatriculée au RCS de Lyon, SIRET 85140233600008.",
+        "Изпълнител: ЕИК/БУЛСТАТ 8311214560008, регистриран в София.",
+        "Payment schedule: 923 000 915 000 548 000 178 000",
+        "The annual fee increases by +1 250 000 EUR from 1 January 2027.",
+        "Orden de compra 80220193 B, anexo 12345678 Z.",
+        "ДДС номер: BG0000001000061",
         "Eingetragen im Handelsregister HRB 84421.",
         "CIF B-66214508, inscrita en el Registro Mercantil de Barcelona.",
         "Immatriculée au RCS de Lyon sous le numéro 851 402 336.",
-        "SIRET 85140233600018.",
         "Payment terms: forty-five (45) days from receipt.",
         "Aggregate liability shall not exceed 500 000 EUR.",
         "The annual charge is 620 000 EUR excluding VAT.",
