@@ -56,6 +56,17 @@ class TruncatedError(LLMError):
 
 
 @dataclass(frozen=True, slots=True)
+class AgentRun:
+    """The result of a bounded tool-use loop."""
+
+    text: str
+    usage: Usage
+    usd: float
+    latency_ms: int
+    iterations: int
+
+
+@dataclass(frozen=True, slots=True)
 class LLMResult[TValue]:
     value: TValue
     usage: Usage
@@ -164,6 +175,88 @@ class LLMClient:
             stop_reason=response.stop_reason,
         )
 
+    async def run_agent(
+        self,
+        *,
+        purpose: str,
+        tools: list[Any],
+        messages: Sequence[dict[str, Any]],
+        system: str | Iterable[dict[str, Any]] | None = None,
+        effort: Effort = "medium",
+        max_tokens: int = 8_000,
+        max_iterations: int = 12,
+        attachment_id: int | None = None,
+    ) -> AgentRun:
+        """A bounded tool-use loop, metered like everything else.
+
+        Usage is summed across every iteration and written as one ledger row, so
+        an agent that took nine round trips reports what it actually cost rather
+        than what its last message cost.
+        """
+        self._assert_within_budget(attachment_id)
+
+        kwargs: dict[str, Any] = {
+            "model": self._settings.model,
+            "max_tokens": max_tokens,
+            "messages": list(messages),
+            "tools": tools,
+            "output_config": {"effort": effort},
+            "thinking": {"type": "adaptive"},
+            "max_iterations": max_iterations,
+            # The runner resends the whole conversation each iteration, so the
+            # history is the thing worth caching -- not just the system prompt.
+            # Without this the loop's input cost grows quadratically in turns.
+            "cache_control": {"type": "ephemeral"},
+        }
+        if system is not None:
+            kwargs["system"] = system
+
+        started = time.perf_counter()
+        total = Usage()
+        iterations = 0
+        text = ""
+
+        try:
+            runner = self._client.beta.messages.tool_runner(**kwargs)
+            async for message in runner:
+                iterations += 1
+                total = _add(total, _usage_from(message.usage))
+                text = _text_of(message) or text
+                if message.stop_reason == "refusal":
+                    details = getattr(message, "stop_details", None)
+                    raise RefusalError(
+                        getattr(details, "category", None),
+                        getattr(details, "explanation", None),
+                    )
+        except Exception as exc:
+            self._record(
+                purpose=purpose,
+                effort=effort,
+                usage=total,
+                latency_ms=_elapsed_ms(started),
+                attachment_id=attachment_id,
+                ok=False,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+            raise
+
+        latency_ms = _elapsed_ms(started)
+        self._record(
+            purpose=purpose,
+            effort=effort,
+            usage=total,
+            latency_ms=latency_ms,
+            attachment_id=attachment_id,
+            ok=True,
+        )
+        return AgentRun(
+            text=text,
+            usage=total,
+            usd=cost_usd(self._settings.model, total),
+            latency_ms=latency_ms,
+            iterations=iterations,
+        )
+
     def spent_on(self, attachment_id: int | None) -> float:
         """USD spent on one document so far."""
         if attachment_id is None:
@@ -213,6 +306,24 @@ class LLMClient:
             )
         )
         self._session.flush()
+
+
+def _add(a: Usage, b: Usage) -> Usage:
+    return Usage(
+        input_tokens=a.input_tokens + b.input_tokens,
+        output_tokens=a.output_tokens + b.output_tokens,
+        cache_read_tokens=a.cache_read_tokens + b.cache_read_tokens,
+        cache_write_tokens=a.cache_write_tokens + b.cache_write_tokens,
+    )
+
+
+def _text_of(message: Any) -> str:
+    parts = [
+        block.text
+        for block in getattr(message, "content", [])
+        if getattr(block, "type", None) == "text"
+    ]
+    return "\n".join(parts).strip()
 
 
 def _elapsed_ms(started: float) -> int:
