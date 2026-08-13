@@ -80,6 +80,10 @@ class ItemView:
     counterparty_score: float | None
     usd: float
     notes: str
+    #: Personal-data items masked at load, by category. Shown so a reviewer
+    #: reading a quote with [IBAN] in it knows why, and so that "clean
+    #: document" and "redaction did not run" are distinguishable.
+    redactions: dict[str, int]
 
     @property
     def route(self) -> Route:
@@ -137,7 +141,7 @@ def load_item(session: Session, item_id: int) -> ItemView | None:
     if row is None:
         return None
 
-    item, decision, enrichment, extraction, _document, attachment = row
+    item, decision, enrichment, extraction, document, attachment = row
     email = session.get(Email, attachment.email_id)
     spent = session.scalar(
         select(func.coalesce(func.sum(LLMCall.usd), 0.0)).where(
@@ -161,6 +165,7 @@ def load_item(session: Session, item_id: int) -> ItemView | None:
         counterparty_score=enrichment.counterparty_score,
         usd=float(spent or 0.0),
         notes=str(extraction.fields.get("notes") or ""),
+        redactions=dict(document.redactions or {}),
     )
 
 

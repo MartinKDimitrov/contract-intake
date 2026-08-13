@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
 from contract_intake.config import Settings, get_settings
@@ -40,6 +40,43 @@ def build_engine(database_url: str) -> Engine:
     return engine
 
 
+class StaleSchemaError(RuntimeError):
+    """An existing database predates the current models."""
+
+
+def assert_schema_current(engine: Engine) -> None:
+    """Fail at startup if a table on disk is missing a column the models declare.
+
+    ``create_all`` creates missing *tables* and silently ignores missing
+    *columns*, so adding a field to a model leaves an existing database one
+    column short and the mismatch surfaces much later as an opaque "no such
+    column" in the middle of a pipeline run.
+
+    There is no Alembic here on purpose (docs/TRADEOFFS.md), which makes this
+    check the thing that keeps that decision honest: without migrations the
+    remedy is to recreate the database, and the least a developer is owed is to
+    be told that at startup rather than mid-document.
+    """
+    inspector = inspect(engine)
+    existing = set(inspector.get_table_names())
+    stale: list[str] = []
+
+    for name, table in Base.metadata.tables.items():
+        if name not in existing:
+            continue  # create_all handles a table that is not there at all
+        on_disk = {column["name"] for column in inspector.get_columns(name)}
+        missing = sorted(c.name for c in table.columns if c.name not in on_disk)
+        stale.extend(f"{name}.{column}" for column in missing)
+
+    if stale:
+        raise StaleSchemaError(
+            "database predates the current models -- missing "
+            + ", ".join(stale)
+            + ". There are no migrations by design: recreate the database "
+            "(delete it, or point CI_DATABASE_URL elsewhere) and re-poll."
+        )
+
+
 def init_db(settings: Settings | None = None) -> Engine:
     """Create the engine, the data directories and any missing tables.
 
@@ -58,6 +95,7 @@ def init_db(settings: Settings | None = None) -> Engine:
 
     _engine = build_engine(settings.database_url)
     Base.metadata.create_all(_engine)
+    assert_schema_current(_engine)
     _session_factory = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
     return _engine
 

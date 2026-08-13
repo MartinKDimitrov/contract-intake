@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from contract_intake.config import Settings
-from contract_intake.extract.schema import REQUIRED_FOR_AUTO_APPROVAL
+from contract_intake.extract.schema import DECISION_BEARING, REQUIRED_FOR_AUTO_APPROVAL
 from contract_intake.status import Route
 
 RULES_VERSION = 1
@@ -219,6 +219,34 @@ def rule_wholly_unverifiable(ev: Evidence, _s: Settings) -> list[Reason]:
     ]
 
 
+def rule_partially_unverifiable(ev: Evidence, _s: Settings) -> list[Reason]:
+    """A decision-bearing value that nothing could check.
+
+    The rule above only fires when *every* field is unverifiable, which one
+    verified field disarms -- and the cheapest field to verify (our own name, in
+    a header) is also the least load-bearing. So a mixed document could carry a
+    liability cap read off a photograph, or attributed to one, straight to
+    auto-approval.
+
+    An unverifiable value is not a lie; a scan genuinely has no text layer to
+    check against. It is simply not evidence, and a decision should not rest on
+    it without a person seeing it.
+    """
+    unchecked = [name for name in DECISION_BEARING if ev.provenance.get(name) == "unverifiable"]
+    if not unchecked:
+        return []
+    return [
+        Reason(
+            rule="partially_unverifiable",
+            message=(
+                f"{len(unchecked)} value(s) a decision rests on could not be checked "
+                f"against a text layer: {', '.join(unchecked)}"
+            ),
+            fields=tuple(unchecked),
+        )
+    ]
+
+
 def rule_not_a_contract(ev: Evidence, _s: Settings) -> list[Reason]:
     kind = ev.extraction.get("document_kind")
     if kind in (None, "contract", "amendment", "order_form"):
@@ -233,6 +261,7 @@ def rule_not_a_contract(ev: Evidence, _s: Settings) -> list[Reason]:
 
 ALL_RULES: tuple[Callable[[Evidence, Settings], list[Reason]], ...] = (
     rule_not_a_contract,
+    rule_partially_unverifiable,
     rule_suspended_counterparty,
     rule_unresolved_counterparty,
     rule_high_severity_findings,

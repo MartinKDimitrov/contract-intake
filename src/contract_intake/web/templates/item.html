@@ -10,6 +10,12 @@
   {%- if view.counterparty_score %} ({{ '%.2f'|format(view.counterparty_score) }}){% endif %}
   &middot; ${{ '%.4f'|format(view.usd) }} to process
   &middot; <span class="tag">{{ view.item.state }}</span>
+  {%- if view.redactions %}
+  &middot; masked
+  {%- for category, count in view.redactions.items() %}
+    <span class="tag">{{ count }} {{ category|replace('_', ' ') }}</span>
+  {%- endfor %}
+  {%- endif %}
 </p>
 
 <h2>Why this needs a person</h2>

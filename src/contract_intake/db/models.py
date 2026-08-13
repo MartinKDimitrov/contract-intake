@@ -29,7 +29,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from contract_intake.status import Route, Status
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _now() -> datetime:
@@ -100,6 +100,7 @@ class Document(Base):
     text_pages: Mapped[int] = mapped_column(Integer, default=0)
     image_pages: Mapped[int] = mapped_column(Integer, default=0)
     pages: Mapped[list[Any]] = mapped_column(default=list)
+    redactions: Mapped[dict[str, Any]] = mapped_column(default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
 

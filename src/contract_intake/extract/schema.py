@@ -129,3 +129,19 @@ REQUIRED_FOR_AUTO_APPROVAL: tuple[str, ...] = (
     "payment_terms_days",
     "governing_law",
 )
+
+#: Every field a routing decision is actually taken on -- the required ones plus
+#: the ones the playbook thresholds read. The distinction matters: the required
+#: set answers "is this record complete enough to file", while this set answers
+#: "did we check the things we are about to decide on". A confidence floor or a
+#: provenance rule applied only to the first set leaves the liability cap, the
+#: renewal flag and the data-processing agreement ungated, which is where the
+#: expensive mistakes live.
+DECISION_BEARING: tuple[str, ...] = (
+    *REQUIRED_FOR_AUTO_APPROVAL,
+    "auto_renewal",
+    "termination_notice_days",
+    "liability_cap",
+    "liability_uncapped",
+    "dpa_present",
+)

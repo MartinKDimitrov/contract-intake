@@ -146,11 +146,20 @@ def test_cosmetic_differences_still_verify(quote: str) -> None:
 
 def test_typographic_punctuation_is_folded() -> None:
     document = Document(
-        pages=[Page(number=1, kind="text", text="the Supplier\u2019s liability is capped")]
+        pages=[
+            Page(
+                number=1,
+                kind="text",
+                text="the Supplier\u2019s liability is capped at EUR 500,000",
+            )
+        ]
     )
     e = build(
         liability_cap=MoneyField(
-            value=1.0, confidence=0.8, source_quote="the Supplier's liability is capped", page=1
+            value=500000.0,
+            confidence=0.8,
+            source_quote="the Supplier's liability is capped at EUR 500,000",
+            page=1,
         )
     )
     assert verdict_for(e, document, "liability_cap").status == "verified"
@@ -176,7 +185,7 @@ def test_quote_from_a_scanned_page_is_unverifiable() -> None:
 
     assert v.status == "unverifiable"
     assert v.confidence == pytest.approx(0.93), "confidence survives; it just is not confirmed"
-    assert "scanned" in v.note
+    assert "no text layer" in v.note
 
 
 def test_unverifiable_is_not_counted_as_hallucination() -> None:
@@ -207,7 +216,47 @@ def test_mixed_document_verifies_text_pages_and_excuses_image_pages() -> None:
     assert verdict_for(e, document, "signatories").status == "unverifiable"
 
 
-def test_short_quotes_are_not_punished() -> None:
-    """ "30 days" appears everywhere; failing it would be a false accusation."""
+def test_a_short_quote_cannot_verify_anything() -> None:
+    """A quote too short to locate is not evidence, whether or not it occurs.
+
+    This test used to assert the opposite. The length check sat *after* the
+    search, so it was only ever reached by quotes that had already failed to
+    match -- and it handed them back the model's own confidence. Any fabricated
+    value could defeat verification by keeping its quote under twelve
+    characters.
+    """
     e = build(term_months=IntField(value=24, confidence=0.7, source_quote="24 mo", page=1))
-    assert verdict_for(e, text_document(), "term_months").status == "unverifiable"
+    v = verdict_for(e, text_document(), "term_months")
+
+    assert v.status == "not_found"
+    assert v.confidence == 0.0
+    assert "too short" in v.note
+
+
+def test_a_claimed_scan_page_cannot_launder_an_invented_quote() -> None:
+    """The model supplies ``page``, so it must not be able to skip checking.
+
+    On a mixed document the value is still marked unverifiable rather than
+    called a lie -- but ``rule_partially_unverifiable`` then blocks it, so the
+    claim buys nothing.
+    """
+    from contract_intake.loaders.document import Document, Page
+
+    mixed = Document(
+        pages=[
+            Page(number=1, kind="text", text="MASTER SERVICES AGREEMENT between the parties."),
+            Page(number=2, kind="image", image_path="/tmp/p2.png", width=800, height=1100),
+        ]
+    )
+    e = build(
+        payment_terms_days=IntField(
+            value=60,
+            confidence=0.99,
+            source_quote="PAYMENT IS DUE NET 60 DAYS AS AGREED",
+            page=2,
+        )
+    )
+    v = verdict_for(e, mixed, "payment_terms_days")
+
+    assert v.status == "unverifiable"
+    assert "is a scan" in v.note

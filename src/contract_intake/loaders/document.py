@@ -13,13 +13,15 @@ text and exactly one image, instead of twenty images.
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
 from contract_intake.config import Settings
 from contract_intake.loaders.detect import IMAGE_KINDS, FileKind, sniff_path
 from contract_intake.loaders.image import encode_page_image, normalise_image
+from contract_intake.loaders.redact import redact
 
 log = logging.getLogger(__name__)
 
@@ -75,6 +77,11 @@ class Page:
 @dataclass(frozen=True, slots=True)
 class Document:
     pages: list[Page]
+    #: How many items of each personal-data category were masked, by category.
+    #: Empty means the text was clean; the flag below distinguishes that from
+    #: redaction having been switched off.
+    redactions: dict[str, int] = field(default_factory=dict)
+    redacted: bool = False
 
     @property
     def page_count(self) -> int:
@@ -97,6 +104,24 @@ class Document:
         """Concatenated text layer, used to verify extraction quotes."""
         return "\n".join(p.text for p in self.pages if p.kind == "text")
 
+    def mask_personal_data(self) -> Document:
+        """Return a copy with personal data masked out of every text page.
+
+        Image pages pass through untouched -- there is no text layer to search,
+        so a scanned page reaches the model as photographed. That gap is real
+        and is documented rather than papered over.
+        """
+        pages: list[Page] = []
+        found: Counter[str] = Counter()
+        for page in self.pages:
+            if page.kind != "text" or not page.text:
+                pages.append(page)
+                continue
+            text, counts = redact(page.text)
+            found.update(counts)
+            pages.append(replace(page, text=text))
+        return Document(pages=pages, redactions=dict(found), redacted=True)
+
     def to_json(self) -> list[dict[str, Any]]:
         return [p.to_json() for p in self.pages]
 
@@ -106,13 +131,20 @@ class Document:
 
 
 def load(path: Path, *, settings: Settings, into: Path) -> Document:
-    """Load a file into pages, rendering only what has no text layer."""
+    """Load a file into pages, rendering only what has no text layer.
+
+    Personal data is masked here, at the point the text comes into existence,
+    so that no later stage -- and no database row -- ever holds the raw value.
+    """
     kind = sniff_path(path)
     if kind in IMAGE_KINDS:
-        return _load_image(path, settings=settings, into=into)
-    if kind is FileKind.PDF:
-        return _load_pdf(path, settings=settings, into=into)
-    raise ValueError(f"cannot load {kind} as a document")
+        document = _load_image(path, settings=settings, into=into)
+    elif kind is FileKind.PDF:
+        document = _load_pdf(path, settings=settings, into=into)
+    else:
+        raise ValueError(f"cannot load {kind} as a document")
+
+    return document.mask_personal_data() if settings.redact_personal_data else document
 
 
 def _load_image(path: Path, *, settings: Settings, into: Path) -> Document:

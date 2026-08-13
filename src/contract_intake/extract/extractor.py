@@ -94,20 +94,82 @@ async def extract(
 
 
 def verify_provenance(extraction: ContractExtraction, document: Document) -> list[FieldVerdict]:
-    """Check every quote against the document, and zero the fields that fail."""
-    haystack = _normalise(document.all_text)
+    """Check every quote against the document, and zero the fields that fail.
+
+    Two properties this has to hold, both learned the hard way:
+
+    * **The model does not get to choose whether it is checked.** ``page`` is a
+      value the model emits, so any test that lets a claimed page number skip
+      verification is a bypass the model controls. A page claim can only ever
+      make checking *impossible* (an image page), never *unnecessary*, and the
+      impossible case is escalated by ``rule_partially_unverifiable`` rather
+      than passed over here.
+    * **Every failure zeroes.** There is no branch that leaves a failed quote
+      holding the model's own confidence.
+    """
+    text_pages = {p.number: _normalise(p.text) for p in document.pages if p.kind == "text"}
+    whole = _normalise(document.all_text)
     image_pages = {p.number for p in document.pages if p.kind == "image"}
     verdicts: list[FieldVerdict] = []
 
     for name, evidence in extraction.evidence_fields().items():
-        verdicts.append(_verify_one(name, evidence, haystack, image_pages))
+        verdicts.append(_verify_one(name, evidence, text_pages, whole, image_pages))
     return verdicts
+
+
+def _digits(text: str) -> str:
+    return "".join(c for c in text if c.isdigit())
+
+
+def supports_value(name: str, value: Any, quote: str) -> bool:
+    """Does this quote actually say what the field claims?
+
+    Locating a quote proves it came from the document. It does not prove it is
+    evidence *for the value beside it* -- and boilerplate present in every
+    contract ("This Agreement is entered into") will locate perfectly while
+    supporting nothing. Without this test, "verified" means only that the model
+    emitted twelve characters that occur somewhere in the file.
+
+    Deliberately one-sided. It fires only when the quote positively disagrees
+    with the value or carries nothing that could support it, so its errors are
+    false alarms that cost a reviewer five minutes -- never quiet approvals.
+
+    Booleans are exempt: no wording of "the term shall not renew automatically"
+    contains ``False``.
+    """
+    if isinstance(value, bool) or value is None:
+        return True
+
+    if isinstance(value, int | float):
+        # "sixty (60) days" carries 60; a numeric claim quoting prose with no
+        # number in it is not evidence, whatever else the prose says.
+        wanted = _digits(f"{value:.0f}" if isinstance(value, float) else str(value))
+        return bool(wanted) and wanted in _digits(quote)
+
+    text = str(value).strip()
+    if not text:
+        return True
+
+    if name == "effective_date":
+        # The field is normalised to ISO; the document says "14 March 2026".
+        # The year is the part that survives every rendering.
+        year = text[:4]
+        return not year.isdigit() or year in quote
+
+    return _normalise(text) in _normalise(quote)
+
+
+def _fail(name: str, evidence: Evidence, note: str) -> FieldVerdict:
+    previous = evidence.confidence
+    evidence.confidence = 0.0
+    return FieldVerdict(name, "not_found", 0.0, f"{note} (model claimed {previous:.2f})")
 
 
 def _verify_one(
     name: str,
     evidence: Evidence,
-    haystack: str,
+    text_pages: dict[int, str],
+    whole: str,
     image_pages: set[int],
 ) -> FieldVerdict:
     value = getattr(evidence, "value", None)
@@ -119,31 +181,59 @@ def _verify_one(
 
     quote = (evidence.source_quote or "").strip()
     if not quote:
-        evidence.confidence = 0.0
-        return FieldVerdict(name, "not_found", 0.0, "value given with no supporting quote")
+        return _fail(name, evidence, "value given with no supporting quote")
 
-    if evidence.page in image_pages or not haystack:
+    # Before the search, not after it. Reached the other way round, this test
+    # rescues exactly the quotes that could not be found -- the fabricated ones.
+    if len(quote) < MIN_VERIFIABLE_QUOTE_CHARS:
+        return _fail(name, evidence, f"quote of {len(quote)} chars is too short to locate")
+
+    if not supports_value(name, value, quote):
+        return _fail(name, evidence, f"quote does not support the value {value!r}")
+
+    needle = _normalise(quote)
+    claimed = evidence.page
+
+    if claimed in text_pages:
+        if needle in text_pages[claimed]:
+            return FieldVerdict(name, "verified", evidence.confidence)
+        if needle in whole:
+            found_on = next((n for n, text in text_pages.items() if needle in text), None)
+            return FieldVerdict(
+                name,
+                "verified",
+                evidence.confidence,
+                f"quote is on page {found_on}, not the claimed page {claimed}",
+            )
+        return _fail(name, evidence, "quote not present in the document")
+
+    if not text_pages:
         return FieldVerdict(
             name,
             "unverifiable",
             evidence.confidence,
-            "quote is on a scanned page; no text layer to check against",
+            "the document has no text layer; no quote could be checked",
         )
 
-    if _normalise(quote) in haystack:
-        return FieldVerdict(name, "verified", evidence.confidence)
+    if claimed in image_pages:
+        # Checking really is impossible, so the value is not called a lie -- but
+        # it is not called verified either, and the rule layer blocks on it.
+        return FieldVerdict(
+            name,
+            "unverifiable",
+            evidence.confidence,
+            f"quote is attributed to page {claimed}, which is a scan",
+        )
 
-    if len(quote) < MIN_VERIFIABLE_QUOTE_CHARS:
-        return FieldVerdict(name, "unverifiable", evidence.confidence, "quote too short to locate")
+    if needle in whole:
+        return FieldVerdict(
+            name,
+            "verified",
+            evidence.confidence,
+            f"quote located, but page {claimed} is not a page of this document",
+        )
 
-    previous = evidence.confidence
-    evidence.confidence = 0.0
-    return FieldVerdict(
-        name,
-        "not_found",
-        0.0,
-        f"quote not present in the document (model claimed {previous:.2f})",
-    )
+    return _fail(name, evidence, "quote not present in the document")
 
 
 def _normalise(text: str) -> str:

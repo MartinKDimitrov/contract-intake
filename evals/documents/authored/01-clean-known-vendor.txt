@@ -42,8 +42,15 @@ hereby agree as follows.
    This Agreement is governed by the laws of the Republic of Bulgaria.
    The courts of Sofia shall have exclusive jurisdiction.
 
+8. NOTICES AND SETTLEMENT
+   Undisputed invoices are settled to the Supplier's account
+   DE89 3704 0044 0532 0130 00 at Commerzbank AG, Hamburg.
+   Operational notices: logistik.ops@nordwind.example.de, tel. +49 40 5559 2210.
+   Customer contact: i.petrova@meridianrail.example.bg, tel. +359 2 4891 220.
+
 IN WITNESS WHEREOF the parties have executed this Agreement.
 
   For Meridian Rail Holdings AD          For Nordwind Logistik GmbH
   ______________________                 ______________________
   I. Petrova, CFO                        K. Brandt, Managing Director
+  EGN 7523169263                         Prokurist, Reg. HRB 84421

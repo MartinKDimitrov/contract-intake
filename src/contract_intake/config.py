@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     enrich_effort: Effort = "medium"
     max_usd_per_document: float = 0.75
 
+    #: Mask personal data out of page text before it reaches a model or the
+    #: database. On by default: a contract carries identifiers that the fields
+    #: being extracted never need. Turn it off only where the extracted record
+    #: is required to carry them, and where a processing agreement covers it.
+    redact_personal_data: bool = True
+
     # --- Email intake ------------------------------------------------------
     imap_host: str = "imap.gmail.com"
     imap_port: int = 993

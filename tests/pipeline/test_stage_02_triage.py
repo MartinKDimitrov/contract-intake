@@ -110,6 +110,29 @@ LANGUAGE_PAIRS = [
 ]
 
 
+#: Documents that define a party as "hereinafter X" without creating anything.
+#: "hereby" was demoted from strong to supporting for this reason; its Spanish
+#: and French equivalents were added as strong terms anyway, and a certificate
+#: and a declaration classified as contracts until they were demoted too.
+HEREINAFTER_LOOKALIKES = [
+    (
+        "es",
+        "CERTIFICADO DE CONFORMIDAD\nMeridia Transporte, S.L., en adelante 'el "
+        "Titular', cumple la norma ISO 9001 para sus servicios.",
+    ),
+    (
+        "fr",
+        "DÉCLARATION SUR L'HONNEUR\nLa société Meridia SAS, ci-après 'le Déclarant', "
+        "atteste de ses prestations et de sa responsabilité.",
+    ),
+]
+
+
+@pytest.mark.parametrize(("language", "text"), HEREINAFTER_LOOKALIKES)
+def test_defining_a_party_is_not_creating_an_agreement(language: str, text: str) -> None:
+    assert triage.classify_text(text).kind != "contract", language
+
+
 @pytest.mark.parametrize(("language", "contract", "notice"), LANGUAGE_PAIRS)
 def test_each_language_admits_contracts_and_turns_away_notices(
     language: str, contract: str, notice: str

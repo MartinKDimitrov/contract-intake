@@ -15,7 +15,8 @@ policy, or into a human review queue with the specific reason it was not.
    IMAP / webhook ──▶│ 01 receive   Source     →  RECEIVED         │  0 tokens
                     ├──────────────────────────────────────────────┤
                     │ 02 triage    RECEIVED   →  TRIAGED           │  0 tokens
-                    │ 03 load      TRIAGED    →  LOADED            │  0 tokens  ← cost lever
+                    │ 03 load      TRIAGED    →  LOADED            │  0 tokens  ← cost lever;
+                    │                                                  masks personal data
                     │ 04 extract   LOADED     →  EXTRACTED         │  LLM, structured
                     │ 05 enrich    EXTRACTED  →  ENRICHED          │  checks free,
                     │                                                 agent only if
@@ -103,7 +104,7 @@ because it creates attachments rather than advancing one. See TRADEOFFS.md.
 |---|---|---|
 | `emails` | 01 | one row per message, deduplicated on `Message-ID` |
 | `attachments` | 01 | one row per file; **`status` is the queue** |
-| `documents` | 03 | page count and the per-page text/image decision |
+| `documents` | 03 | page count, the per-page text/image decision, masked-item counts |
 | `extractions` | 04 | fields, each with confidence, source quote and page |
 | `enrichments` | 05 | agent findings plus the full tool trace |
 | `decisions` | 06 | route, reasons, blocking fields |
@@ -115,6 +116,22 @@ because it creates attachments rather than advancing one. See TRADEOFFS.md.
 `enrichments.tool_trace` is persisted in full and rendered next to each finding
 in the review UI: it is the evidence that the knowledge base changed the outcome
 rather than decorating it.
+
+## Personal data
+
+Stage 04 discloses contract text to a third-party processor, so a closed set of
+personal identifiers is masked in `loaders/redact.py` at the point page text is
+produced — before the model sees it and before it is written to `documents`.
+
+Two things make this safe to leave on by default. Every category is validated by
+checksum rather than matched by shape, because a company UIC and a personal
+number are both runs of digits and `counterparty_registration_id` is a field the
+pipeline extracts. And the masked text *is* the stored text, so quote
+verification searches exactly what the model was given.
+
+An image page has no text layer, so a scanned contract reaches the model as
+photographed. That gap is real; the reasoning and the alternatives are in
+[TRADEOFFS.md](TRADEOFFS.md).
 
 ## Extraction with provenance
 
@@ -155,9 +172,15 @@ Four phases spend nothing. Of the two that do, stage 03 — which spends nothing
 itself — determines most of stage 04's bill by deciding per page between text
 (cheap) and vision (roughly 6× more for a full document).
 
-`llm/client.py` is the only path to the API, and it writes to `llm_calls` on
-success, refusal and exception alike. Nothing can spend without being recorded,
-which is what makes the published numbers measured rather than estimated.
+`llm/client.py` is the only path to the API. It writes to `llm_calls` on
+success, refusal and exception alike — nothing can spend without being recorded,
+which is what makes the published numbers measured rather than estimated — and
+it refuses to call at all once a single document has spent
+`max_usd_per_document`, checked *before* each request rather than after.
+
+A document that has been seen before never gets that far: stage 01 deduplicates
+on the attachment `sha256`, so the same PDF arriving twice under two names
+enters the pipeline once.
 
 Deterministic checks run before the agent, so a document that already fails one
 costs nothing to enrich. Full breakdown: [COST_MODEL.md](COST_MODEL.md).

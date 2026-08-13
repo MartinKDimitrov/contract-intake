@@ -69,7 +69,15 @@ sentence.
 
 **Nothing spends money unrecorded.** `llm/client.py` is the only path to the
 API, and it writes tokens, cache split, USD and latency to `llm_calls` on
-success, refusal and exception alike.
+success, refusal and exception alike. It also refuses to call once one document
+has spent `max_usd_per_document`, checked before the request, not after.
+
+**Personal data does not leave the building.** A signatory's national identity
+number and the account an invoice is paid into are nothing the extracted fields
+need, so they are masked in stage 03 — before the model sees the page and before
+it reaches the database. Each category is checksum-validated rather than
+pattern-matched, because a company registration number is an extracted field and
+looks much like a personal one.
 
 Detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); every decision that could
 have gone the other way, with the condition that would flip it, in

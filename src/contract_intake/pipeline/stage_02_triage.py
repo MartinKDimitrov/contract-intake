@@ -73,14 +73,12 @@ STRONG_TERMS: tuple[str, ...] = (
     "las partes acuerdan",
     "ambas partes convienen",
     "ley aplicable",
-    "en adelante",
     # French
     "le présent contrat",
     "la présente convention",
     "les parties conviennent",
     "droit applicable",
     "il a été convenu",
-    "ci-après",
 )
 
 #: Commercial vocabulary that supports a classification but cannot carry it. An
@@ -121,6 +119,8 @@ SUPPORTING_TERMS: tuple[str, ...] = (
     "cláusula",
     "responsabilidad",
     "rescisión",
+    # "hereinafter": defines a defined term, and a certificate defines those too
+    "en adelante",
     "contrat",
     "convention",
     "les parties",
@@ -129,6 +129,7 @@ SUPPORTING_TERMS: tuple[str, ...] = (
     "prestations",
     "responsabilité",
     "résiliation",
+    "ci-après",
 )
 
 INVOICE_TERMS: tuple[str, ...] = (
@@ -211,6 +212,16 @@ DISQUALIFYING_TERMS: tuple[str, ...] = (
     "обявление за поръчка",
     "обявление за възложена",
     "състезателна процедура",
+    "certificado de",
+    "certifica que",
+    "declaración",
+    "declara que",
+    "acta de recepción",
+    "attestation de",
+    "certifie que",
+    "déclaration",
+    "déclare que",
+    "procès-verbal",
     "anuncio de licitación",
     "anuncio de adjudicación",
     "pliego de condiciones",

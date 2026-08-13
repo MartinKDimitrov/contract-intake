@@ -7,7 +7,7 @@ OUT      Status.LOADED
 TOKENS   0 -- but this stage determines most of stage 04's bill.
 FAILS    page that renders but yields no text and no image, pathological page
          count, embedded fonts that defeat text extraction, rasterisation OOM.
-DEPENDS  loaders/document.py, loaders/image.py
+DEPENDS  loaders/document.py, loaders/image.py, loaders/redact.py
 
 This is the single biggest cost lever in the system, so it gets its own stage
 rather than hiding inside extraction:
@@ -23,6 +23,11 @@ rather than hiding inside extraction:
 No OCR engine. Pages without a text layer go to the model as images and Claude
 reads them directly. That drops a system-level dependency (tesseract) and, on
 noisy scans, reads better than OCR-then-text.
+
+This stage is also where personal data leaves the pipeline. Page text is masked
+as it is produced, so neither the model nor the database ever holds a national
+identity number or a bank account -- see loaders/redact.py, including what is
+deliberately kept and what a scanned page means for the guarantee.
 """
 
 from __future__ import annotations
@@ -79,19 +84,23 @@ class LoadStage:
                 text_pages=document.text_pages,
                 image_pages=document.image_pages,
                 pages=document.to_json(),
+                redactions=document.redactions,
             )
         )
         ctx.session.flush()
 
+        masked = sum(document.redactions.values())
         return Advanced(
             note=(
                 f"{document.page_count} page(s): {document.text_pages} as text, "
                 f"{document.image_pages} as image (~{document.estimated_tokens} tokens)"
+                + (f"; masked {masked} item(s) of personal data" if masked else "")
             ),
             metrics={
                 "pages": float(document.page_count),
                 "text_pages": float(document.text_pages),
                 "image_pages": float(document.image_pages),
                 "estimated_tokens": float(document.estimated_tokens),
+                "redacted_items": float(masked),
             },
         )

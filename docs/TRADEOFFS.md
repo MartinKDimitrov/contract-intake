@@ -97,8 +97,19 @@ the concurrency strategy in `runner.pick_next` is the real work.
 **Why:** there is no deployed instance to migrate. Migrations solve a problem
 this project does not have yet.
 
-**Stops being right when:** anything runs against data you cannot recreate.
-Tracked in `HAND_OVER.md`.
+**Cost, honestly:** `create_all` creates missing tables and silently ignores
+missing *columns*, so adding a field to a model leaves an existing database one
+column short — and the mismatch surfaces much later as an opaque "no such
+column" halfway through a pipeline run. That is not a theoretical concern; it
+is how the `documents.redactions` column announced itself. So
+`assert_schema_current()` runs at startup and refuses to proceed against a
+database that predates the models, naming the missing columns and the remedy.
+It is not a migration system, it is the guard that makes living without one
+survivable.
+
+**Stops being right when:** anything runs against data you cannot recreate — at
+which point the guard stops being enough, because its remedy is "recreate the
+database".
 
 ### Chroma for ~65 vectors
 
@@ -169,6 +180,46 @@ simplicity and accuracy.
 
 **Stops being right when:** volume makes per-page vision tokens dominate the
 bill. At that point OCR-first with vision as fallback is the cheaper shape.
+
+### Masking personal data at load, with validated patterns
+
+**Chose:** mask a closed set of personal identifiers -- IBAN, payment card,
+Bulgarian, Spanish and French national identity numbers, email, international
+phone -- in `loaders/redact.py`, at the moment page text is produced. Every
+category is validated by checksum, not merely matched by shape.
+
+**Instead of:** sending the page as it stands (what the pipeline did until
+now), or running a general PII model such as Presidio over it.
+
+**Why:** stage 04 discloses contract text to a third-party processor. A
+signatory's national identity number and the account an invoice is paid into
+are personal data that none of the fifteen extracted fields need. Masking at
+load rather than at the API boundary means the database never holds the raw
+value either, and it keeps `source_quote` verification honest -- the model
+quotes the same text the verifier searches.
+
+Validation is what makes it safe to leave on. A Bulgarian company UIC and a
+personal number are both runs of digits; a checksum tells them apart. That
+matters because `counterparty_registration_id` is an extracted field: a
+redactor that eats company registration numbers degrades extraction silently,
+which is worse than not redacting at all.
+
+**Cost, honestly:** coverage is a list, and a list is always incomplete -- a
+German Personalausweis or a Polish PESEL passes through today. A general PII
+model would catch more, at the price of a heavy dependency, a per-document
+latency cost, and false positives on exactly the company identifiers this must
+preserve. The narrow, checksum-verified set is the version whose failure mode
+is "missed something" rather than "broke extraction".
+
+The real gap is scans. An image page has no text layer, so a photographed
+contract reaches the model unmasked. Closing that needs OCR, which the system
+deliberately does not have.
+
+**Stops being right when:** a deployment must extract payment details, or
+processes documents from countries outside the covered set often enough that
+the list stops being maintainable -- at which point a model-based recogniser
+earns its dependency. `redact_personal_data` turns it off; the flag exists so
+that choice is explicit rather than a code change.
 
 ### Routing is deterministic
 

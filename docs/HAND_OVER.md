@@ -24,6 +24,7 @@ once) and renders the corpus to PDF.
 | variable | what breaks without it |
 |---|---|
 | `ANTHROPIC_API_KEY` | stages 04 and 05; everything else still runs |
+| `CI_REDACT_PERSONAL_DATA` | masking of personal data before it reaches the model. On by default; turn it off only where the extracted record must carry payment or identity details and a processing agreement covers it |
 | `CI_IMAP_USER`, `CI_IMAP_PASSWORD` | intake. Gmail needs an App Password, not the account password |
 | `CI_IMAP_FOLDER` | **read the warning below** |
 
@@ -48,8 +49,8 @@ label*, then point `CI_IMAP_FOLDER` at that label.
 ## What is real and what is not
 
 **Real:** the pipeline, the state machine, retries and dead letters, extraction
-with verified provenance, both retrieval methods, the deterministic checks, the
-routing rules, the review queue, and the cost ledger. All of it runs against a
+with verified provenance, personal-data masking, both retrieval methods, the
+deterministic checks, the routing rules, the review queue, and the cost ledger. All of it runs against a
 live mailbox and a live API.
 
 **Synthetic, and must be replaced before this is useful to anyone:**
@@ -102,8 +103,25 @@ will claim the same row. This is the point at which SQLite has to go: the fix is
 change in application code.
 
 **Schema changes against data you cannot recreate.** There are no migrations —
-`Base.metadata.create_all()` plus a `schema_version` column. Add Alembic before
-the first deployment that holds real contracts.
+`Base.metadata.create_all()` plus a `schema_version` column. Adding a field to a
+model does not alter an existing table, so `assert_schema_current()` refuses to
+start against a database that predates the models and tells you which columns
+are missing; the only remedy it can offer is to delete the database. Add Alembic
+before the first deployment that holds real contracts.
+
+**A national identifier the redactor does not know.** `loaders/redact.py`
+covers IBAN, payment cards, email, international phone numbers, and the
+Bulgarian, Spanish and French personal identity numbers. A German
+Personalausweis or a Polish PESEL passes through to the model. Adding one is a
+validator and a pattern in that file; do not add a pattern without a checksum,
+because company registration numbers look the same and one of them is an
+extracted field.
+
+**A scanned contract is not masked at all.** Image pages have no text layer, so
+`redact.py` cannot see them and the page reaches the model as photographed.
+There is no OCR in this system by design. If the corpus is mostly scans, this
+control is mostly not operating, and that should drive the decision about
+whether to add OCR — not extraction quality, which is fine without it.
 
 **A contract longer than 120 pages** is rejected by triage as a probable bundle
 (`loaders/pdf.MAX_REASONABLE_PAGES`). That threshold is a guess.
@@ -158,11 +176,27 @@ extracted. Writing `evals/expected/*.json` for the contracts among them widens
 the extraction number past documents whose answers I also authored. About $0.70
 and an hour.
 
-**2. Batch processing.** The Batches API is 50% cheaper for up to 24 hours of
+**2. Vision escalation for a quote that cannot be verified.** Today a
+`source_quote` the verifier cannot locate zeroes that field's confidence and the
+document goes to a human. Often the cause is a page whose text layer is partly
+broken rather than a model that invented the quote — and the fix is narrow:
+re-send *that page only* as an image and re-extract the affected fields. It uses
+machinery that already exists (stage 03 decides text-vs-vision per page), costs
+one page of vision rather than a document, and turns a review into an
+auto-approval. It needs a document that reproduces the failure before it can be
+measured, which is why it is not built.
+
+**3. Corrections as evals.** `review_items.human_corrections` is captured but
+never compared with what the model produced. Recording the pair — field, model
+value, human value — turns operator time into a growing ground-truth set, which
+is the cheapest available answer to the weakness named above: that the expected
+values were written by the same person who wrote the documents.
+
+**4. Batch processing.** The Batches API is 50% cheaper for up to 24 hours of
 latency, which contract intake by email can absorb comfortably. It needs an
 async submit-and-poll path in stage 04, which is why it has not been done.
 
-**3. A local model for extraction, measured rather than assumed.** Only
+**5. A local model for extraction, measured rather than assumed.** Only
 text-layer documents are a plausible candidate; scanned pages are where local
 vision models are weakest and the agent loop is where they are weakest again.
 The method:
@@ -175,12 +209,17 @@ The method:
 - Adopt only if field accuracy holds on the scanned fixture too, and route
   image pages to the API regardless.
 
-**4. Cheaper enrichment, once there is a sample to decide on.** `claude-haiku-4-5`
+**6. Cheaper enrichment, once there is a sample to decide on.** `claude-haiku-4-5`
 was 6.7x cheaper and missed one finding while adding a false positive
 ([COST_MODEL.md](COST_MODEL.md)). The per-stage model setting already exists;
 the decision needs more than three documents.
 
-**5. A sixth language.** Romanian or Polish, following the pattern in
+**7. Policy that changes with time.** `playbook_checks.json` has one version,
+so a contract is checked against today's thresholds rather than the ones in
+force when it was signed. Real playbooks change; `effective_from` / `effective_to`
+on each check, selected by `effective_date`, is the shape of the fix.
+
+**8. A sixth language.** Romanian or Polish, following the pattern in
 `stage_02_triage.py`, with a positive case per the warning above, and verified
 with `make corpus && make triage`.
 
