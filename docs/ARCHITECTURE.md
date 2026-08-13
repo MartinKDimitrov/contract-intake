@@ -219,7 +219,8 @@ make setup     # venv + dependencies
 make test      # hermetic; no API key needed
 make lint      # ruff + mypy strict
 make run       # review UI, /healthz, /metrics/costs
-make poll      # IMAP poller + pipeline worker
+make poll      # one pass: fetch mail, drain the pipeline
+make watch     # the same on a loop, at imap_poll_seconds
 make stage N=04 ID=17
 make triage    # classify every document, by provenance, free
 make check     # everything a commit must pass -- see TESTING.md

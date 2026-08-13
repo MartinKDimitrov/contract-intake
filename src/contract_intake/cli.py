@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 
 from sqlalchemy import func, select
 
@@ -25,6 +26,8 @@ from contract_intake.llm.client import LLMClient
 from contract_intake.pipeline.runner import STAGE_BY_NUMBER, STAGES, advance, drain
 from contract_intake.pipeline.stage_01_receive import ImapSource
 from contract_intake.status import Status, is_terminal
+
+log = logging.getLogger(__name__)
 
 
 def _cmd_stage(args: argparse.Namespace) -> int:
@@ -63,15 +66,53 @@ def _cmd_stage(args: argparse.Namespace) -> int:
 
 
 def _cmd_poll(args: argparse.Namespace) -> int:
-    """Fetch new mail, then advance everything it produced."""
+    """Fetch new mail and advance the pipeline, once or until interrupted.
+
+    With ``--watch`` this is the worker: it keeps looking, at the interval in
+    `imap_poll_seconds`, and drains whatever it finds. Without it the command
+    runs a single pass, which is what a cron entry or a test wants.
+
+    It drains on every pass rather than only when mail arrived. A backlog left
+    by a previous crash is work already paid for, and a poller that only moves
+    documents it fetched itself would leave it sitting there.
+    """
+    settings = get_settings()
     source = ImapSource()
-    with session_scope() as session:
-        created = asyncio.run(source.poll(session, get_settings()))
-        print(f"intake: {len(created)} new attachment(s) {created or ''}")
-        if created and not args.intake_only:
+
+    def once() -> None:
+        with session_scope() as session:
+            created = asyncio.run(source.poll(session, settings))
+            if created:
+                print(f"intake: {len(created)} new attachment(s) {created}", flush=True)
+            if args.intake_only:
+                return
             result = asyncio.run(drain(session=session, llm=LLMClient(session)))
-            print(f"pipeline: {result}")
-    return 0
+            if result.transitions:
+                print(f"pipeline: {result}", flush=True)
+
+    if not args.watch:
+        once()
+        return 0
+
+    print(
+        f"watching {settings.imap_folder!r} every {settings.imap_poll_seconds}s; ctrl-c to stop",
+        flush=True,
+    )
+    while True:
+        try:
+            once()
+        except KeyboardInterrupt:
+            print("stopped", flush=True)
+            return 0
+        except Exception:
+            # A poller that dies on one bad pass is not a poller. The failure is
+            # recorded; the next pass tries again.
+            log.exception("poll failed; retrying in %ss", settings.imap_poll_seconds)
+        try:
+            time.sleep(settings.imap_poll_seconds)
+        except KeyboardInterrupt:
+            print("stopped", flush=True)
+            return 0
 
 
 def _cmd_mailbox(_args: argparse.Namespace) -> int:
@@ -202,6 +243,7 @@ def main() -> int:
     p_stage.set_defaults(func=_cmd_stage)
 
     p_poll = sub.add_parser("poll", help="fetch new mail and run the pipeline")
+    p_poll.add_argument("--watch", action="store_true", help="keep polling at imap_poll_seconds")
     p_poll.add_argument("--intake-only", action="store_true", help="stop after stage 01")
     p_poll.set_defaults(func=_cmd_poll)
 

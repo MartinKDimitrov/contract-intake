@@ -14,7 +14,8 @@ make check            # everything a commit must pass; the pre-commit hook runs 
 make test             # the suite alone, hermetic -- no API key, no network
 make triage           # classify 135 documents, free
 make run              # review queue on :8000
-make poll             # fetch mail and run the pipeline
+make poll             # fetch mail and run the pipeline, once
+make watch            # the same, on a loop -- this is the worker
 ```
 
 Python 3.12. `make setup` also downloads Chroma's ONNX embedding model (~80MB,

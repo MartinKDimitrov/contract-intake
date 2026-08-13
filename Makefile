@@ -80,6 +80,10 @@ fields:  ## Align field declarations into columns, and keep the formatter off th
 verify:  ## Quote verification over the real corpus (free)
 	$(PY) evals/verify.py
 
+.PHONY: watch
+watch:  ## Keep polling and draining until interrupted -- the worker
+	$(PY) -m contract_intake.cli poll --watch
+
 .PHONY: dead
 dead:  ## What could not be finished, and why
 	$(PY) -m contract_intake.cli dead
@@ -98,7 +102,7 @@ run:  ## Serve the review UI on :8000
 	$(PY) -m uvicorn contract_intake.web.app:app --reload --port 8000
 
 .PHONY: poll
-poll:  ## Run the IMAP poller + pipeline worker
+poll:  ## Fetch mail and run the pipeline once
 	$(PY) -m contract_intake.cli poll
 
 .PHONY: stage
