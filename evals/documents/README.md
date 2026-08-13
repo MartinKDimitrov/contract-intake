@@ -3,14 +3,14 @@
 Where a document came from decides what a result on it is worth, so the folders
 say it rather than a footnote.
 
-| folder | n | what it is | in git |
-|---|---|---|---|
-| `authored/` | 6 | written by hand for this project | yes |
-| `generated/gemini/` | 10 | produced by Gemini | yes |
-| `generated/chatgpt/` | 10 | produced by ChatGPT | yes |
-| `generated/grok/` | 10 | produced by Grok | yes |
-| `collected/` | 100 | fetched unmodified from a public source | no, see below |
-| `rendered/` | — | PDFs built from the text above | no, derived |
+| folder               | n   | what it is                              | in git        |
+|----------------------|-----|-----------------------------------------|---------------|
+| `authored/`          | 6   | written by hand for this project        | yes           |
+| `generated/gemini/`  | 10  | produced by Gemini                      | yes           |
+| `generated/chatgpt/` | 10  | produced by ChatGPT                     | yes           |
+| `generated/grok/`    | 10  | produced by Grok                        | yes           |
+| `collected/`         | 100 | fetched unmodified from a public source | no, see below |
+| `rendered/`          | —   | PDFs built from the text above          | no, derived   |
 
 ## The distinction that matters
 

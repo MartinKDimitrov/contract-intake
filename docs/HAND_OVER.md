@@ -8,9 +8,10 @@ what is stubbed, what will break first, and what to build next.
 ## Running it
 
 ```bash
-make setup            # venv, dependencies, embedding model, rendered corpus
+make setup            # venv, dependencies, embedding model, corpus, pre-commit hook
 cp .env.example .env  # then fill in the values below
-make test             # 323 tests, hermetic -- no API key, no network
+make check            # everything a commit must pass; the pre-commit hook runs it
+make test             # the suite alone, hermetic -- no API key, no network
 make triage           # classify 135 documents, free
 make run              # review queue on :8000
 make poll             # fetch mail and run the pipeline
@@ -21,12 +22,12 @@ once) and renders the corpus to PDF.
 
 ### Configuration
 
-| variable | what breaks without it |
-|---|---|
-| `ANTHROPIC_API_KEY` | stages 04 and 05; everything else still runs |
-| `CI_REDACT_PERSONAL_DATA` | masking of personal data before it reaches the model. On by default; turn it off only where the extracted record must carry payment or identity details and a processing agreement covers it |
-| `CI_IMAP_USER`, `CI_IMAP_PASSWORD` | intake. Gmail needs an App Password, not the account password |
-| `CI_IMAP_FOLDER` | **read the warning below** |
+| variable                           | what breaks without it                                           |
+|------------------------------------|------------------------------------------------------------------|
+| `ANTHROPIC_API_KEY`                | stages 04 and 05; everything else still runs                     |
+| `CI_REDACT_PERSONAL_DATA`          | masking before the model sees the page. On by default; see below |
+| `CI_IMAP_USER`, `CI_IMAP_PASSWORD` | intake. Gmail needs an App Password, not the account password    |
+| `CI_IMAP_FOLDER`                   | **read the warning below**                                       |
 
 Everything else has a working default; see `.env.example`.
 
@@ -55,11 +56,11 @@ live mailbox and a live API.
 
 **Synthetic, and must be replaced before this is useful to anyone:**
 
-| file | what it is |
-|---|---|
-| `knowledge/data/vendors.json` | 20 invented suppliers. No real company appears. |
-| `knowledge/data/playbook.md` | An invented contracting policy. |
-| `knowledge/data/playbook_checks.json` | The machine-checkable half of the same. |
+| file                                      | what it is                                               |
+|-------------------------------------------|----------------------------------------------------------|
+| `knowledge/data/vendors.json`             | 21 invented suppliers. No real company appears.          |
+| `knowledge/data/playbook.md`              | An invented contracting policy.                          |
+| `knowledge/data/playbook_checks.json`     | The machine-checkable half of the same.                  |
 | `evals/documents/authored/`, `generated/` | Invented contracts and lookalikes. `collected/` is real. |
 
 The vendor registry is a JSON file because that is the smallest thing that
@@ -76,12 +77,12 @@ stays prose.
 
 ## What the numbers rest on
 
-| claim | measured on |
-|---|---|
-| Triage: 135/135 correct, zero tokens | 35 authored and generated + 100 real TED notices in bg/de/en/es/fr, 1,719 pages |
-| Extraction: 29/29 fields | 3 authored contracts, including a degraded scan |
-| Knowledge base: 4/4 deviations found, 0/4 without it | 1 contract with four known deviations |
-| Cost: $0.061–0.105 per document | the ledger, across the runs above |
+| claim                                                | measured on                                                           |
+|------------------------------------------------------|-----------------------------------------------------------------------|
+| Triage: 135/135 correct, zero tokens                 | 35 authored and generated + 100 TED notices, 5 languages, 1,719 pages |
+| Extraction: 29/29 fields                             | 3 authored contracts, including a degraded scan                       |
+| Knowledge base: 4/4 deviations found, 0/4 without it | 1 contract with four known deviations                                 |
+| Cost: $0.061–0.105 per document                      | the ledger, across the runs above                                     |
 
 The triage number is the strong one: a hundred of those documents were written
 by European contracting authorities with no knowledge of this system.
@@ -90,20 +91,22 @@ by European contracting authorities with no knowledge of this system.
 documents that I wrote, with expected values that I also wrote. 100% on 29
 fields is encouraging and is not evidence — which is precisely why
 `evals/documents/` is filed by provenance: the folder a number came from is part
-of the number. Extending `evals/expected/` over the thirty generated contracts
-is the first thing to do, and costs about $0.70.
+of the number. Extending `evals/expected/` over the eight generated documents that classify as
+contracts is the first thing to do, and costs about $0.85.
 
 ---
 
 ## What will break first
 
 **A second worker process.** `runner.pick_next` has no locking, so two pollers
-will claim the same row. This is the point at which SQLite has to go: the fix is
+will claim the same row. The intake half is now constrained -- `attachments.sha256`
+is unique, so a duplicate insert fails rather than succeeding twice -- but the
+claim on a queued row is not. This is the point at which SQLite has to go: the fix is
 `SELECT ... FOR UPDATE SKIP LOCKED` on Postgres, and `DATABASE_URL` is the only
 change in application code.
 
 **Schema changes against data you cannot recreate.** There are no migrations —
-`Base.metadata.create_all()` plus a `schema_version` column. Adding a field to a
+`Base.metadata.create_all()` plus a startup column check. Adding a field to a
 model does not alter an existing table, so `assert_schema_current()` refuses to
 start against a database that predates the models and tells you which columns
 are missing; the only remedy it can offer is to delete the database. Add Alembic
@@ -150,6 +153,26 @@ them.
 
 ---
 
+## Known vulnerability in a dependency
+
+`make audit` reports **PYSEC-2026-311** against `chromadb`, with no fixed version
+published. It is a pre-authentication remote code execution in Chroma's HTTP
+API: an unauthenticated request to
+`/api/v2/tenants/{tenant}/databases/{db}/collections` can load a malicious model
+repository when `trust_remote_code` is set.
+
+**Not reachable here.** `knowledge/policy.py` uses `chromadb.PersistentClient`,
+which is the embedded library. No server is started, no port is opened, and
+nothing in this repository serves that endpoint. The audit is configured to pass
+with this advisory named explicitly rather than silenced, so the exemption is
+visible and has to be re-justified if it ever changes.
+
+**Re-check it if any of these become true:** Chroma is moved to a client/server
+deployment, `chromadb.HttpClient` appears anywhere, or the knowledge base is
+shared between processes. At that point the right move is to pin a fixed version
+if one exists by then, or to replace Chroma -- there are 16 vectors here and
+the retrieval interface is one module.
+
 ## Runbook
 
 **Documents stop moving.** `make dead` lists what could not be finished, with
@@ -178,11 +201,10 @@ saw. Start with the provenance status of the field that was wrong.
 ## Next, in order
 
 **1. Ground truth beyond the documents I wrote.** `evals/documents/generated/`
-holds thirty contracts and lookalikes from three different models — addenda,
+holds thirty documents from three different models, eight of which are contracts — addenda,
 bilingual leases, an NDA, an SLA — that have passed triage but never been
 extracted. Writing `evals/expected/*.json` for the contracts among them widens
-the extraction number past documents whose answers I also authored. About $0.70
-and an hour.
+the extraction number past documents whose answers I also authored. About $0.85 and an hour.
 
 **2. Vision escalation for a quote that cannot be verified.** Today a
 `source_quote` the verifier cannot locate zeroes that field's confidence and the

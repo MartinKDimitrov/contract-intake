@@ -23,9 +23,12 @@ identifier is not personal data; a natural person's identifier is.
 Two rules keep it from doing more harm than good, and both were learned by
 measuring rather than by reasoning:
 
-**Validated, not merely matched.** Every candidate goes through the real
-checksum -- IBAN mod-97 with the country's own length, the Bulgarian weighted
-sum, the French key, the Spanish check letter.
+**Validated where a checksum exists.** IBAN goes through mod-97 with the
+country's own length, the Bulgarian personal number through its weighted sum,
+the French through its key, the Spanish through its check letter, cards through
+Luhn. Email and phone have no checksum to run: an address is matched on shape
+alone, and a phone number on shape plus a digit count -- which is why both of
+those are the categories where a false positive would be cheapest.
 
 **Personal identifiers are recognised only beside a label.** Checksums alone are
 not enough to tell a person's number from a company's, because the schemes were
@@ -87,7 +90,10 @@ _IBAN = re.compile(r"\b[A-Za-z]{2}\d{2}[ -]?(?:[A-Za-z0-9]{4}[ -]?){2,7}[A-Za-z0
 #: ``label , up to a little punctuation , number`` -- the number is group 1 so
 #: the label survives into the masked text and the reviewer can still see what
 #: kind of thing was removed.
-_LABELLED = "(?i)(?:{labels})\\s*(?:n[o°º.]|number|№|:|\\.|-)?\\s*({number})"
+#: The separator is optional and may be written several ways at once: "no.",
+#: "No:", "№". Allowing only one token meant `n[o]` consumed the "no" and left
+#: the "." unmatched, so "Card no. 4111 ..." was not masked at all.
+_LABELLED = "(?i)(?:{labels})[\\s.:#-]*(?:n[o°º]|number|№)?[\\s.:#-]*({number})"
 
 _ID_LABELS = (
     r"егн|бул\s*егн|eгн|egn"  # Bulgarian personal number

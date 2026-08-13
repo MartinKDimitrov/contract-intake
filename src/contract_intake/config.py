@@ -1,6 +1,8 @@
 """Process configuration.
 
-Everything tunable lives here so the pipeline stages stay free of magic numbers.
+Everything an operator tunes lives here. Thresholds a deployment does not choose
+-- retry counts, vocabulary hit counts, page ceilings -- stay next to the code
+that reads them, where the reasoning for the number is.
 Values come from the environment (see .env.example); nothing is read from the
 environment anywhere else in the codebase.
 """
@@ -69,7 +71,7 @@ class Settings(BaseSettings):
     """Long edge for a page sent to vision.
 
     Image tokens scale with area, roughly (w*h)/750. At 1568px an A4 page costs
-    about 4.6k tokens; at 1400px about 3.7k; at 1000px about 1.9k. Lower is
+    about 2,300 tokens; at 1400px about 1,850; at 1000px about 940. Lower is
     cheaper and less legible -- the setting is swept in evals/ rather than
     guessed. This is the single largest knob on the bill.
     """

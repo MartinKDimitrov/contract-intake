@@ -1,8 +1,8 @@
 """Image normalisation for pages that must be read by the model.
 
 Image tokens scale with area -- roughly ``(width * height) / 750`` -- so the
-long edge is the price dial. An A4 page costs about 4.6k tokens at 1568px and
-about 1.9k at 1000px. Legibility falls with it, which is why the setting lives
+long edge is the price dial. An A4 page costs about 1,850 tokens at 1400px and
+about 940 at 1000px. Legibility falls with it, which is why the setting lives
 in config and is swept in evals/ rather than picked here.
 
 Greyscale, not colour: contract pages carry no information in hue, and dropping

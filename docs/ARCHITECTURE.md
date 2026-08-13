@@ -13,7 +13,7 @@ policy, or into a human review queue with the specific reason it was not.
 
 ```
                     ┌──────────────────────────────────────────────┐
-   IMAP / webhook ──▶│ 01 receive   Source     →  RECEIVED         │  0 tokens
+            IMAP ──▶│ 01 receive   Source     →  RECEIVED         │  0 tokens
                     ├──────────────────────────────────────────────┤
                     │ 02 triage    RECEIVED   →  TRIAGED           │  0 tokens
                     │ 03 load      TRIAGED    →  LOADED            │  0 tokens  ← cost lever;
@@ -30,7 +30,7 @@ policy, or into a human review queue with the specific reason it was not.
                    contracts                      review_items
 ```
 
-Four of seven phases spend nothing. That is deliberate: the cheapest token is
+Five of seven phases spend nothing. That is deliberate: the cheapest token is
 the one never sent.
 
 ## One phase, one file
@@ -53,8 +53,13 @@ other way around: `adapters/` (01), `loaders/` (03), `extract/` (04),
 ## The state machine
 
 `attachments.status` is the work queue — there is no broker. The worker picks
-the oldest attachment in a status some stage consumes, runs exactly that stage,
-and persists the result.
+the attachment *furthest along* the pipeline, runs exactly that stage, and
+persists the result.
+
+Furthest along, not oldest. Age orders a queue plausibly and wrongly here: it
+advances every document one step before advancing any of them two, so a batch
+finishes nothing until it all finishes. Thirteen real documents exhausted a
+transition budget with no contract row to show for it.
 
 ```
 RECEIVED → TRIAGED → LOADED → EXTRACTED → ENRICHED → DECIDED → DELIVERED
@@ -65,7 +70,9 @@ RECEIVED → TRIAGED → LOADED → EXTRACTED → ENRICHED → DECIDED → DELIV
 Three consequences worth naming:
 
 - **Crash resumption is free.** A process killed mid-extraction leaves the row
-  in `LOADED`; the next start picks it up there.
+  in `LOADED`; the next start picks it up there. A stage that *fails* rather
+  than dies is rolled back to a savepoint first, so it cannot leave half its
+  output behind for the retry to duplicate.
 - **Any phase can be replayed in isolation** — `make stage N=04 ID=17` — which
   is most of the inner development loop, since re-tuning extraction does not pay
   to re-run loading.
@@ -101,18 +108,18 @@ because it creates attachments rather than advancing one. See TRADEOFFS.md.
 
 ## Data model
 
-| Table | Written by | Holds |
-|---|---|---|
-| `emails` | 01 | one row per message, deduplicated on `Message-ID` |
-| `attachments` | 01 | one row per file; **`status` is the queue** |
-| `documents` | 03 | page count, the per-page text/image decision, masked-item counts |
-| `extractions` | 04 | fields, each with confidence, source quote and page |
-| `enrichments` | 05 | agent findings plus the full tool trace |
-| `decisions` | 06 | route, reasons, blocking fields |
-| `contracts` | 07 | the clean record downstream systems read |
-| `review_items` | 07 | the human queue |
-| `llm_calls` | `llm/client.py` | **the cost ledger** — every call, no exceptions |
-| `dead_letters` | `runner` | anything unfinishable, with enough context to replay |
+| Table          | Written by                                          | Holds                                                            |
+|----------------|-----------------------------------------------------|------------------------------------------------------------------|
+| `emails`       | 01                                                  | one row per message, deduplicated on `Message-ID`                |
+| `attachments`  | 01                                                  | one row per file; **`status` is the queue**                      |
+| `documents`    | 03                                                  | page count, the per-page text/image decision, masked-item counts |
+| `extractions`  | 04                                                  | fields, each with confidence, source quote and page              |
+| `enrichments`  | 05                                                  | agent findings plus the full tool trace                          |
+| `decisions`    | 06                                                  | route, reasons, blocking fields                                  |
+| `contracts`    | 07 and the review UI, both via `store/contracts.py` | the clean record downstream systems read                         |
+| `review_items` | 07                                                  | the human queue                                                  |
+| `llm_calls`    | `llm/client.py`                                     | **the cost ledger** — every call, no exceptions                  |
+| `dead_letters` | `runner`                                            | anything unfinishable, with enough context to replay             |
 
 `enrichments.tool_trace` is persisted in full and rendered next to each finding
 in the review UI: it is the evidence that the knowledge base changed the outcome
@@ -144,19 +151,22 @@ This is the difference between a system that knows and one that guessed, and it
 is the only honest input to routing — stage 06 cannot make a defensible decision
 from a bare value with no evidence behind it.
 
-The schema is fifteen fields in `extract/schema.py`, each wrapped in `Evidence`.
-`REQUIRED_FOR_AUTO_APPROVAL` names the five that must be present and confident
-before a contract can pass without a human.
+The schema is fifteen fields in `extract/schema.py`, thirteen of them wrapped in
+`Evidence`. `document_kind` and `notes` carry no provenance.
+`REQUIRED_FOR_AUTO_APPROVAL` names the five a contract must state before it can
+pass without a human, enforced by `rule_missing_required_fields`.
+`DECISION_BEARING` is wider -- those five plus every field a playbook threshold
+reads -- and carries the confidence floor and the provenance rule, because a
+liability cap nobody checked is where the expensive mistakes live.
 
 ## Knowledge base
 
 Two jobs, two retrieval methods, because they are not the same problem:
 
-| Collection | Job | Method |
-|---|---|---|
-| `vendors` | resolve "NordWind Logistics Ltd." on a scan to a registry entry | fuzzy string matching, embedding fallback |
-| `policy` | check "payment terms: 90 days" against the playbook ceiling | dense retrieval, returns the clause and its section |
-| `precedents` | give a reviewer approved wording for a deviation | dense retrieval |
+| Collection | Job                                                             | Method                                                  |
+|------------|-----------------------------------------------------------------|---------------------------------------------------------|
+| `vendors`  | resolve "NordWind Logistics Ltd." on a scan to a registry entry | token-sorted edit distance, deliberately not embeddings |
+| `policy`   | check "payment terms: 90 days" against the playbook ceiling     | dense retrieval, returns the clause and its section     |
 
 Policy validation is the part the model cannot do alone — no amount of reasoning
 tells it what *this company's* liability ceiling is.
@@ -169,9 +179,9 @@ documents that pass every check, and its job is what a comparison cannot express
 
 ## Cost model
 
-Four phases spend nothing. Of the two that do, stage 03 — which spends nothing
+Five phases spend nothing. Of the two that do, stage 03 — which spends nothing
 itself — determines most of stage 04's bill by deciding per page between text
-(cheap) and vision (roughly 6× more for a full document).
+(cheap) and vision (7.4x more, measured).
 
 `llm/client.py` is the only path to the API. It writes to `llm_calls` on
 success, refusal and exception alike — nothing can spend without being recorded,
@@ -212,7 +222,8 @@ make run       # review UI, /healthz, /metrics/costs
 make poll      # IMAP poller + pipeline worker
 make stage N=04 ID=17
 make triage    # classify every document, by provenance, free
-make test      # 323 tests, hermetic -- see TESTING.md
+make check     # everything a commit must pass -- see TESTING.md
 make eval      # field accuracy and knowledge-base contribution (costs money)
 make dead      # what could not be finished, and why
+make audit     # the checks that do not depend on my judgement
 ```

@@ -24,7 +24,8 @@ contract, its failure modes and its token cost in one screen. It also makes
 extraction without paying to re-run loading is most of the inner development
 loop.
 
-**Cost, honestly:** for ~2000 lines this risks reading as ceremony; a single
+**Cost, honestly:** at roughly 6,000 lines this is defensible; at the ~2,000 it
+started from it risked reading as ceremony; a single
 module gets perhaps 80% of the benefit. It also weakens type safety, since data
 now travels between phases through the database rather than through function
 arguments — mitigated by re-validating into the Pydantic model at each stage
@@ -92,7 +93,8 @@ the concurrency strategy in `runner.pick_next` is the real work.
 
 ### No Alembic
 
-**Chose:** `Base.metadata.create_all()` plus a `schema_version` column.
+**Chose:** `Base.metadata.create_all()` plus a startup check that the columns on
+disk match the models.
 
 **Why:** there is no deployed instance to migrate. Migrations solve a problem
 this project does not have yet.
@@ -111,7 +113,7 @@ survivable.
 which point the guard stops being enough, because its remedy is "recreate the
 database".
 
-### Chroma for ~65 vectors
+### Chroma for 16 vectors
 
 **Chose:** Chroma persistent client, file-based, using its bundled ONNX
 embedding model.
@@ -161,7 +163,7 @@ under-reporting ledger is worse than none. Better to fail on an unknown model.
 **Chose:** stage 03 decides per page, not per document.
 
 **Why:** the single largest cost lever in the system. A 20-page contract as text
-is roughly 15k tokens; as page images, roughly 95k. A born-digital contract with
+is roughly 5k tokens; as page images, roughly 37k. A born-digital contract with
 one scanned signature page sends 19 text pages and exactly one image.
 
 ### No OCR engine
