@@ -18,21 +18,32 @@ CACHE_READ_MULTIPLIER = 0.10
 class ModelRates:
     input_per_mtok: float
     output_per_mtok: float
+    adaptive_thinking: bool = True
+    """Whether the model accepts `thinking: {type: "adaptive"}` and `effort`.
+
+    These arrived with the 4.6 generation. Sending either to an older model is a
+    400, not a silently-ignored field -- which matters here, because the model is
+    a per-stage setting and mixing generations is the point of having it.
+    """
 
 
 RATES: dict[str, ModelRates] = {
-    "claude-opus-5": ModelRates(input_per_mtok=5.00, output_per_mtok=25.00),
-    "claude-opus-4-8": ModelRates(input_per_mtok=5.00, output_per_mtok=25.00),
-    "claude-sonnet-5": ModelRates(input_per_mtok=3.00, output_per_mtok=15.00),
-    "claude-haiku-4-5": ModelRates(input_per_mtok=1.00, output_per_mtok=5.00),
+    "claude-opus-5": ModelRates(5.00, 25.00),
+    "claude-opus-4-8": ModelRates(5.00, 25.00),
+    "claude-sonnet-5": ModelRates(3.00, 15.00),
+    "claude-haiku-4-5": ModelRates(1.00, 5.00, adaptive_thinking=False),
 }
+
+
+def supports_adaptive_thinking(model: str) -> bool:
+    return rates_for(model).adaptive_thinking
 
 
 class UnknownModelError(KeyError):
     """Raised when a model has no rate entry.
 
-    Deliberately fatal: a silently-unpriced call would make the cost ledger a
-    lie, and the ledger is a deliverable.
+    Deliberately fatal. A silently-unpriced call makes the ledger under-report,
+    and an under-reporting ledger is worse than none at all.
     """
 
 

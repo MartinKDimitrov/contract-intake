@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     # --- LLM ---------------------------------------------------------------
     anthropic_api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
     model: str = "claude-opus-5"
+    extract_model: str = ""
+    enrich_model: str = ""
+    """Per-stage model overrides; empty means fall back to `model`.
+
+    The two stages do work of very different difficulty. Extraction reads
+    degraded scans, decides whether a term is absent or merely missed, and
+    copies quotes verbatim. Enrichment calls three tools and compares numbers to
+    thresholds. Paying the same rate for both is a choice, not a requirement.
+    """
+
     extract_effort: Effort = "medium"
     enrich_effort: Effort = "medium"
     max_usd_per_document: float = 0.75
@@ -65,6 +75,11 @@ class Settings(BaseSettings):
     stray vector glyph; that is not a text layer, and trusting it would send the
     model an almost-empty page instead of the image.
     """
+
+    def model_for(self, purpose: str) -> str:
+        """The model a given stage should use."""
+        override = {"extract": self.extract_model, "enrich": self.enrich_model}.get(purpose, "")
+        return override or self.model
 
     @property
     def attachments_dir(self) -> Path:

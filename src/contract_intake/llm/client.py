@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from contract_intake.config import Effort, Settings, get_settings
 from contract_intake.db.models import LLMCall
-from contract_intake.llm.pricing import Usage, cost_usd
+from contract_intake.llm.pricing import Usage, cost_usd, supports_adaptive_thinking
 
 log = logging.getLogger(__name__)
 
@@ -110,15 +110,15 @@ class LLMClient:
         effort setting survives alongside the JSON schema.
         """
         self._assert_within_budget(attachment_id)
+        model = self._settings.model_for(purpose)
 
         kwargs: dict[str, Any] = {
-            "model": self._settings.model,
+            "model": model,
             "max_tokens": max_tokens,
             "messages": list(messages),
             "output_format": schema,
-            "output_config": {"effort": effort},
-            "thinking": {"type": "adaptive"},
         }
+        kwargs |= _thinking_params(model, effort)
         if system is not None:
             kwargs["system"] = system
 
@@ -128,6 +128,7 @@ class LLMClient:
         except Exception as exc:
             self._record(
                 purpose=purpose,
+                model=model,
                 effort=effort,
                 usage=Usage(),
                 latency_ms=_elapsed_ms(started),
@@ -139,10 +140,11 @@ class LLMClient:
 
         latency_ms = _elapsed_ms(started)
         usage = _usage_from(response.usage)
-        usd = cost_usd(self._settings.model, usage)
+        usd = cost_usd(model, usage)
 
         self._record(
             purpose=purpose,
+            model=model,
             effort=effort,
             usage=usage,
             latency_ms=latency_ms,
@@ -171,7 +173,7 @@ class LLMClient:
             usage=usage,
             usd=usd,
             latency_ms=latency_ms,
-            model=self._settings.model,
+            model=model,
             stop_reason=response.stop_reason,
         )
 
@@ -194,20 +196,20 @@ class LLMClient:
         than what its last message cost.
         """
         self._assert_within_budget(attachment_id)
+        model = self._settings.model_for(purpose)
 
         kwargs: dict[str, Any] = {
-            "model": self._settings.model,
+            "model": model,
             "max_tokens": max_tokens,
             "messages": list(messages),
             "tools": tools,
-            "output_config": {"effort": effort},
-            "thinking": {"type": "adaptive"},
             "max_iterations": max_iterations,
             # The runner resends the whole conversation each iteration, so the
             # history is the thing worth caching -- not just the system prompt.
             # Without this the loop's input cost grows quadratically in turns.
             "cache_control": {"type": "ephemeral"},
         }
+        kwargs |= _thinking_params(model, effort)
         if system is not None:
             kwargs["system"] = system
 
@@ -231,6 +233,7 @@ class LLMClient:
         except Exception as exc:
             self._record(
                 purpose=purpose,
+                model=model,
                 effort=effort,
                 usage=total,
                 latency_ms=_elapsed_ms(started),
@@ -243,6 +246,7 @@ class LLMClient:
         latency_ms = _elapsed_ms(started)
         self._record(
             purpose=purpose,
+            model=model,
             effort=effort,
             usage=total,
             latency_ms=latency_ms,
@@ -252,7 +256,7 @@ class LLMClient:
         return AgentRun(
             text=text,
             usage=total,
-            usd=cost_usd(self._settings.model, total),
+            usd=cost_usd(model, total),
             latency_ms=latency_ms,
             iterations=iterations,
         )
@@ -282,6 +286,7 @@ class LLMClient:
         purpose: str,
         effort: str,
         usage: Usage,
+        model: str = "",
         latency_ms: int,
         attachment_id: int | None,
         ok: bool,
@@ -292,13 +297,13 @@ class LLMClient:
             LLMCall(
                 attachment_id=attachment_id,
                 purpose=purpose,
-                model=self._settings.model,
+                model=model or self._settings.model,
                 effort=effort,
                 input_tokens=usage.input_tokens,
                 output_tokens=usage.output_tokens,
                 cache_read_tokens=usage.cache_read_tokens,
                 cache_write_tokens=usage.cache_write_tokens,
-                usd=cost_usd(self._settings.model, usage),
+                usd=cost_usd(model or self._settings.model, usage),
                 latency_ms=latency_ms,
                 stop_reason=stop_reason,
                 ok=ok,
@@ -324,6 +329,13 @@ def _text_of(message: Any) -> str:
         if getattr(block, "type", None) == "text"
     ]
     return "\n".join(parts).strip()
+
+
+def _thinking_params(model: str, effort: str) -> dict[str, Any]:
+    """Only send thinking and effort to models that accept them."""
+    if not supports_adaptive_thinking(model):
+        return {}
+    return {"thinking": {"type": "adaptive"}, "output_config": {"effort": effort}}
 
 
 def _elapsed_ms(started: float) -> int:
