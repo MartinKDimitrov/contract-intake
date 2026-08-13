@@ -80,56 +80,68 @@
 {% endfor %}
 
 <h2>What the agent looked up</h2>
-{% if not view.agent_ran %}
-  <div class="card">
-    The agent was not called. {{ view.findings_from_rules }} deviation(s) were
-    found by the playbook checks in code, so a paid second opinion on a document
-    already bound for review would have added cost and nothing else.
-  </div>
-{% elif not view.consulted_knowledge_base %}
-  <div class="card high">
-    The agent recorded findings without consulting the registry or the playbook,
-    so they rest on its own priors rather than on this company's policy.
-  </div>
-{% endif %}
-<details>
-  <summary>{{ view.trace|length }} tool call{{ '' if view.trace|length == 1 else 's' }}</summary>
-  <table style="margin-top:10px">
-    <tbody>
-    {% for call in view.trace %}
-      <tr>
-        <td class="mono" style="width:190px">{{ call.tool }}</td>
-        <td>
-          <div class="mono">{{ call.input|tojson|truncate(150) }}</div>
-          <div class="quote mono">{{ call.output|tojson|truncate(220) }}</div>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</details>
+<div class="panel">
+  {% if not view.agent_ran %}
+    <p class="note">
+      The agent was not called. {{ view.findings_from_rules }} deviation(s) were found by the
+      playbook checks in code, so a paid second opinion on a document already bound for review
+      would have added cost and nothing else.
+    </p>
+  {% elif not view.consulted_knowledge_base %}
+    <p class="note warn">
+      The agent recorded findings without consulting the registry or the playbook, so they rest
+      on its own priors rather than on this company's policy.
+    </p>
+  {% else %}
+    <p class="note">
+      The agent ran and consulted the knowledge base. Every lookup it made is below, so a
+      finding can be traced to what it read rather than taken on trust.
+    </p>
+  {% endif %}
+  <details>
+    <summary>{{ view.trace|length }} tool call{{ '' if view.trace|length == 1 else 's' }}</summary>
+    <table>
+      <tbody>
+      {% for call in view.trace %}
+        <tr>
+          <td class="mono" style="width:190px">{{ call.tool }}</td>
+          <td>
+            <div class="mono">{{ call.input|tojson|truncate(150) }}</div>
+            <div class="quote mono">{{ call.output|tojson|truncate(220) }}</div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td class="muted">Nothing was looked up.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</div>
 
 {% if view.item.state == 'open' %}
-  <h2>Decide</h2>
-  <form method="post" action="/review/{{ view.item.id }}/resolve"
-        style="display:flex; gap:10px; align-items:center">
-    <details style="margin-bottom:12px">
-      <summary>Correct a value before approving</summary>
-      <table style="margin-top:8px">
-        <tbody>
-        {% for f in view.fields %}
-          <tr>
-            <td class="mono">{{ f.name }}</td>
-            <td><input name="field:{{ f.name }}" value="{{ f.value if f.value is not none }}"
-                       style="width:100%"></td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </details>
-    <button class="primary" name="action" value="approve">Approve</button>
-    <button name="action" value="reject">Reject</button>
-    <span class="muted">Your decision is recorded beside the machine's, not over it.</span>
+  <h2>Decision</h2>
+  <form method="post" action="/review/{{ view.item.id }}/resolve">
+    <div class="panel">
+      <details>
+        <summary>Correct a value before approving</summary>
+        <table>
+          <tbody>
+          {% for f in view.fields %}
+            <tr>
+              <td class="mono" style="width:34%">{{ f.name }}</td>
+              <td><input name="field:{{ f.name }}"
+                         value="{{ f.value if f.value is not none }}" style="width:100%"></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      <div class="actions">
+        <button class="primary" name="action" value="approve">Approve</button>
+        <button name="action" value="reject">Reject</button>
+        <span class="muted">Your decision is recorded beside the machine's, not over it.</span>
+      </div>
+    </div>
   </form>
 {% else %}
   <h2>Resolved</h2>

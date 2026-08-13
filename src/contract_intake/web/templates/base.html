@@ -122,6 +122,26 @@
     button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
     button.primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
 
+    /* A section that reads as one object: prose, then a disclosure or a form
+       under a hairline divider, rather than a stack of separate boxes. */
+    .panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 14px;
+    }
+    .panel > .note {
+      padding: 18px; font-family: var(--prose); font-size: 15px; line-height: 1.6;
+      color: var(--text-strong); margin: 0;
+    }
+    .panel > .note.warn { background: var(--bad-bg); border-left: 3px solid var(--bad); }
+    .panel > details { border: none; border-top: 1px solid var(--border);
+                       border-radius: 0; margin: 0; background: transparent; }
+    .panel > .actions {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      padding: 16px 18px; border-top: 1px solid var(--border);
+    }
+    .panel > .actions .muted { font-family: var(--prose); font-style: italic; }
+    .panel table { border: none; border-radius: 0; }
+
     .stats {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
       gap: 1px; background: var(--border); border: 1px solid var(--border);
