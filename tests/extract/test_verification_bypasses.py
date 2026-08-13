@@ -1,4 +1,4 @@
-"""The four ways a model could once defeat provenance verification.
+"""The five ways a model could once defeat provenance verification.
 
 Each of these passed on the day it was written. They are kept as one file, with
 one shared document and one control, because the property under test is not
@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from contract_intake.config import Settings
-from contract_intake.extract.extractor import verify_provenance
+from contract_intake.extract.extractor import supports_value, verify_provenance
 from contract_intake.extract.schema import ContractExtraction
 from contract_intake.loaders.document import Document, Page
 from contract_intake.policy.rules import Evidence, decide
@@ -173,6 +173,11 @@ ATTACKS = [
         "not_found",
         id="cites a real clause about a different number",
     ),
+    pytest.param(
+        {"page": 7, "source_quote": "PAYMENT IS DUE NET 60 DAYS AS AGREED"},
+        "not_found",
+        id="claims a page the document does not have",
+    ),
 ]
 
 
@@ -187,3 +192,91 @@ def test_an_invented_payment_term_cannot_reach_auto_approval(
 
     assert status == expected_status
     assert route is Route.NEEDS_REVIEW
+
+
+#: Ordinary words that carry a numeral as a substring. Searched unanchored --
+#: which is how the first version did it -- 14% of the digit-free clause
+#: fragments in this repository's own corpus counted as "containing a number",
+#: and the boilerplate bypass reopened for every numeric field.
+NOT_NUMBERS = [
+    "SOFTWARE MAINTENANCE AND SLA AGREEMENT",
+    "written notice to the other party hereto",
+    "each component of the service described",
+    "under similar terms and conditions",
+    "the tenant shall maintain the premises",
+    "executed in September of that year",
+    "the central office of the Supplier",
+]
+
+
+@pytest.mark.parametrize("quote", NOT_NUMBERS)
+def test_a_word_that_merely_contains_a_numeral_is_not_a_number(quote: str) -> None:
+    assert not supports_value("payment_terms_days", 60, quote), quote
+
+
+#: A quote's digits are the numbers it states, not a concatenation of them.
+#: Flattened, "dated 15 March 2024" reads as "152024", which contains 24, 52,
+#: 202 and 15 -- so a date supported a two-year term and a fifty-two week period.
+DIGITS_THAT_ARE_NOT_THE_VALUE = [
+    ("term_months", 24, "This Agreement is dated 15 March 2024 and is made between"),
+    ("term_months", 52, "This Agreement is dated 15 March 2024"),
+    ("payment_terms_days", 202, "dated 15 March 2024"),
+]
+
+
+@pytest.mark.parametrize(("name", "value", "quote"), DIGITS_THAT_ARE_NOT_THE_VALUE)
+def test_a_number_must_be_stated_whole(name: str, value: int, quote: str) -> None:
+    assert not supports_value(name, value, quote)
+
+
+#: Quotes taken from how contracts are actually drafted, in the five languages
+#: triage claims. A first version of `supports_value` required a numeric value's
+#: digits to appear in its quote, and rejected a third of these -- telling the
+#: reviewer, in each case, that the model had invented the value.
+HONEST_PHRASING = [
+    ("liability_cap", 500_000.0, "shall not exceed five hundred thousand euros"),
+    ("payment_terms_days", 30, "Payment is due net thirty days from receipt"),
+    ("termination_notice_days", 90, "upon ninety days prior written notice"),
+    ("payment_terms_days", 45, "в срок от четиридесет и пет дни"),
+    ("term_months", 36, "für eine Laufzeit von sechsunddreißig Monaten"),
+    ("payment_terms_days", 60, "en un plazo de sesenta días naturales"),
+    ("payment_terms_days", 45, "dans un délai de quarante-cinq jours"),
+    ("term_months", 12, "Die Laufzeit beträgt zwölf Monate"),
+    ("term_months", 24, "eine Laufzeit von vierundzwanzig Monaten"),
+    ("term_months", 12, "El plazo inicial será de doce meses"),
+    ("payment_terms_days", 15, "Le paiement intervient sous quinze jours"),
+    ("liability_cap", 500_000.0, "shall not exceed EUR 500,000"),
+    ("counterparty_registration_id", "HRB84421", "eingetragen HRB 84421 in Hamburg"),
+    ("counterparty_registration_id", "851402336", "sous le numéro 851 402 336"),
+    ("governing_law", "England & Wales", "governed by the laws of England and Wales"),
+    ("signatories", "I. Petrova, CFO; K. Brandt", "I. Petrova, CFO"),
+]
+
+
+@pytest.mark.parametrize(("name", "value", "quote"), HONEST_PHRASING)
+def test_ordinary_drafting_is_not_called_a_fabrication(
+    name: str, value: object, quote: str
+) -> None:
+    assert supports_value(name, value, quote), f"{name}={value!r} rejected on an honest quote"
+
+
+#: The other half of the same test. A rule that never fires is not a rule.
+FABRICATIONS = [
+    ("payment_terms_days", 60, "MASTER SERVICES AGREEMENT dated"),
+    ("payment_terms_days", 60, "This Agreement is entered into by and between"),
+    ("payment_terms_days", 60, "Term twenty-four (24) months"),
+    ("liability_cap", 9_000_000.0, "Liability capped at EUR 500,000"),
+    ("counterparty_name", "Acme Holdings Ltd", "Nordwind Logistik GmbH, HRB 84421"),
+    # governing_law and effective_date were briefly exempt from this check
+    # altogether, which let any locatable sentence support any jurisdiction --
+    # and jurisdiction is the input to a high-severity playbook check.
+    ("governing_law", "Cayman Islands", "This Agreement is entered into by and between"),
+    ("effective_date", "1999-01-01", "AGREEMENT dated 14 March 2026 between"),
+]
+
+
+@pytest.mark.parametrize(("name", "value", "quote"), FABRICATIONS)
+def test_a_quote_that_supports_nothing_is_still_caught(
+    name: str, value: object, quote: str
+) -> None:
+    assert not supports_value(name, value, quote)

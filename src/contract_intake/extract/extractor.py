@@ -121,42 +121,185 @@ def _digits(text: str) -> str:
     return "".join(c for c in text if c.isdigit())
 
 
+#: A number as written: optional thousands groups, optional two-digit cents.
+#: Deliberately not "digits and separators until they stop" -- that swallowed the
+#: comma in "Section 3.2, 45 days" and the full stop in "1 April 2026. 30 days",
+#: merging two unrelated numbers into one the field could never match. Six per
+#: cent of the digit-bearing lines in this repository's corpus were affected.
+_DIGIT_RUN = re.compile(r"\d{1,3}(?:[.,\u00a0 ]\d{3})+(?:[.,]\d{2})?|\d+(?:[.,]\d{2})?")
+
+
+def _numbers_in(text: str) -> set[str]:
+    """Every number the text states, as digits.
+
+    Whole numbers, not a concatenation. Comparing against the concatenation was
+    an open door: "This Agreement is dated 15 March 2024" flattens to "152024",
+    which contains 24, 52, 202 and 15 -- so a date supported a two-year term, a
+    fifty-two week period and a cap of fifteen.
+
+    An amount written with cents yields both readings, because "EUR 500,000.00"
+    and a stated cap of 500000 are the same figure.
+    """
+    found: set[str] = set()
+    for run in _DIGIT_RUN.findall(text):
+        digits = _digits(run)
+        if not digits:
+            continue
+        found.add(digits)
+        if len(run) > 3 and run[-3] in ".," and len(digits) > 2:
+            found.add(digits[:-2])
+    return found
+
+
+#: Fields whose value is a normalised summary rather than a phrase lifted from
+#: the page. "Signing names and titles, comma separated" is not a substring of
+#: anything; neither is a jurisdiction reduced to a country noun. Requiring one
+#: here rejects the honest answer the schema asks for.
+_NOT_VERBATIM = frozenset({"signatories"})
+
+
+#: Numerals as contracts write them out, in the five languages triage claims.
+#: Only the stems that appear in a term, a notice period or an amount -- this is
+#: not a parser, it answers one question: does this quote contain a number at
+#: all? Without it, boilerplate with no digits ("MASTER SERVICES AGREEMENT
+#: dated") counts as evidence for any figure the model likes.
+#:
+#: Anchored on word boundaries, and that is not a detail. Searched as bare
+#: substrings these stems match inside ordinary words -- "MAINTENANCE" carries
+#: "ten", "written" carries "ten", "percent" carries "cent", "component" carries
+#: "one" -- and 14% of the digit-free clause fragments in this repository's own
+#: corpus then counted as containing a number. That reopened the whole bypass.
+_NUMBER_WORDS = re.compile(
+    r"\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen"
+    r"|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty"
+    r"|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million"
+    r"|един|едно|два|две|три|четири|пет|шест|седем|осем|девет|десет"
+    r"|двадесет|тридесет|четиридесет|петдесет|шестдесет|сто|хиляда|милион"
+    r"|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte|treinta"
+    r"|cuarenta|cincuenta|sesenta|noventa|ciento|mil"
+    r"|deux|trois|quatre|cinq|huit|neuf|dix|vingt|trente|quarante"
+    r"|cinquante|soixante|mille"
+    r"|once|doce|trece|catorce|quince"
+    r"|onze|douze|treize|quatorze|quinze)\b",
+    re.IGNORECASE,
+)
+
+#: German, Bulgarian and Spanish write their numerals as single compounds --
+#: "sechsunddreißig", "петнадесет", "veinticuatro" -- so a boundary on the right
+#: rejects every one of them. Anchored on the left only, which is what kills the
+#: substring family anyway: "MAINTENANCE" has no boundary before its "ten".
+#:
+#: German got this treatment first and the other two did not, so an honest
+#: Bulgarian or Spanish contract was told its quote was a fabrication. That is
+#: the worst possible error here: it corrupts the one signal a reviewer is
+#: instructed to trust.
+_COMPOUND_NUMBER_WORDS = re.compile(
+    # German
+    # "ein" and "eins" are omitted on purpose. "ein" is the indefinite article,
+    # so it matches "eine", "einen" and every ordinary German sentence; "eins"
+    # opens "einschließlich". Only "einund-", which is unambiguously a numeral,
+    # survives from that stem.
+    r"\b(?:einund|zwei|drei|vier|fünf|funf|sechs|sieben|acht|neun|zehn|zwölf"
+    r"|zwanzig|dreißig|dreissig|vierzig|fünfzig|funfzig|sechzig|siebzig|achtzig"
+    r"|neunzig|hundert|tausend|million"
+    # Bulgarian: the teens are -надесет compounds, and tens join with "и"
+    r"|единадесет|дванадесет|тринадесет|четиринадесет|петнадесет|шестнадесет"
+    r"|седемнадесет|осемнадесет|деветнадесет|надесет|надесет"
+    r"|двадесет|тридесет|четиридесет|петдесет|шестдесет|седемдесет|осемдесет"
+    r"|деветдесет|двеста|триста|хиляд|милион"
+    # Spanish: 16-29 are written as one word
+    r"|dieciséis|dieciseis|diecisiete|dieciocho|diecinueve|veinti|veintiún"
+    r"|veintiun|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta"
+    r"|noventa|ciento|cientos|mil)",
+    re.IGNORECASE,
+)
+
+
+def _states_a_number(text: str) -> bool:
+    return bool(_NUMBER_WORDS.search(text) or _COMPOUND_NUMBER_WORDS.search(text))
+
+
+def _alphanumeric(text: str) -> str:
+    return "".join(c for c in text.casefold() if c.isalnum())
+
+
 def supports_value(name: str, value: Any, quote: str) -> bool:
-    """Does this quote actually say what the field claims?
+    """Does this quote positively contradict the value beside it?
 
     Locating a quote proves it came from the document. It does not prove it is
-    evidence *for the value beside it* -- and boilerplate present in every
-    contract ("This Agreement is entered into") will locate perfectly while
-    supporting nothing. Without this test, "verified" means only that the model
-    emitted twelve characters that occur somewhere in the file.
+    evidence *for the value* -- boilerplate present in every contract ("This
+    Agreement is entered into") locates perfectly while supporting nothing.
+    Without this test, "verified" means only that the model emitted twelve
+    characters that occur somewhere in the file.
 
-    Deliberately one-sided. It fires only when the quote positively disagrees
-    with the value or carries nothing that could support it, so its errors are
-    false alarms that cost a reviewer five minutes -- never quiet approvals.
+    The test only ever fires on positive disagreement, and that restraint is
+    not politeness. A first version required a numeric value's digits to appear
+    in its quote, which reads as strict and is wrong: contracts write amounts in
+    words, and "Payment is due net thirty days", "five hundred thousand euros"
+    and "an initial term of two (2) years" were all reported as the model having
+    invented the value. A third of realistic quotes failed, and each failure
+    told a reviewer the model had made something up.
 
-    Booleans are exempt: no wording of "the term shall not renew automatically"
-    contains ``False``.
+    So: a quote with no digits cannot contradict a number, and a field whose
+    value is a normalised summary is not asked to be verbatim. What remains --
+    a quote whose numbers all disagree with the claim -- is the case worth
+    catching, and it is the one the fabricated examples fall into.
+
+    One false alarm survives on purpose: a unit conversion, where a term of 24
+    months is quoted from "two (2) years". The quote's digits genuinely disagree
+    with the value, and telling them apart from a fabrication needs unit
+    arithmetic this does not do. It sends an honest contract to a person, which
+    is the direction to be wrong in.
     """
-    if isinstance(value, bool) or value is None:
-        return True
-
-    if isinstance(value, int | float):
-        # "sixty (60) days" carries 60; a numeric claim quoting prose with no
-        # number in it is not evidence, whatever else the prose says.
-        wanted = _digits(f"{value:.0f}" if isinstance(value, float) else str(value))
-        return bool(wanted) and wanted in _digits(quote)
-
-    text = str(value).strip()
-    if not text:
+    if isinstance(value, bool) or value is None or name in _NOT_VERBATIM:
         return True
 
     if name == "effective_date":
-        # The field is normalised to ISO; the document says "14 March 2026".
-        # The year is the part that survives every rendering.
-        year = text[:4]
+        # Normalised to ISO here, written as prose on the page. The year is the
+        # one part that survives every rendering of a date.
+        year = str(value)[:4]
         return not year.isdigit() or year in quote
 
-    return _normalise(text) in _normalise(quote)
+    if name == "governing_law":
+        # The schema asks for the jurisdiction as stated, and a contract states
+        # it adjectivally. Accept the country noun, the adjective, or any of the
+        # phrasings the playbook already knows how to canonicalise.
+        return _states_a_jurisdiction(str(value), quote)
+
+    if isinstance(value, int | float):
+        wanted = _digits(f"{value:.0f}" if isinstance(value, float) else str(value))
+        present = _numbers_in(quote)
+        if present:
+            return not wanted or wanted in present
+        # No digits: acceptable only if the quote spells a number out. Prose
+        # with no number in it cannot be evidence for one.
+        return _states_a_number(quote)
+
+    text = _alphanumeric(str(value))
+    # Spacing and punctuation vary between the value and the page -- "HRB 84421"
+    # against "HRB84421", "851 402 336" against "851402336".
+    return not text or text in _alphanumeric(quote)
+
+
+def _states_a_jurisdiction(value: str, quote: str) -> bool:
+    """Does the quote name the jurisdiction the value claims, however it is written?
+
+    Exempting this field entirely -- which is what an earlier version did -- let
+    any locatable sentence support any jurisdiction, and jurisdiction is the
+    input to a high-severity playbook check.
+    """
+    from contract_intake.policy.thresholds import phrasings_for
+
+    # Fold accents on both sides. The alias table is stored accent-stripped and
+    # `_normalise` keeps accents, so every non-English alias in it was unmatchable
+    # against the accented text a contract actually contains.
+    folded = _fold_accents(_normalise(quote))
+    return any(_fold_accents(_normalise(p)) in folded for p in phrasings_for(value))
+
+
+def _fold_accents(text: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in decomposed if not unicodedata.combining(c))
 
 
 def _fail(name: str, evidence: Evidence, note: str) -> FieldVerdict:

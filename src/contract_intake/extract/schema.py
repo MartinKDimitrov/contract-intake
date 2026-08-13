@@ -26,7 +26,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SCHEMA_VERSION = 1
+#: Version of *this* field schema, distinct from the database schema version
+#: in db/models.py. Two constants of the same name with different values is
+#: a coin toss for whoever imports one of them.
+EXTRACTION_SCHEMA_VERSION = 1
 
 
 class Evidence(BaseModel):
@@ -139,6 +142,9 @@ REQUIRED_FOR_AUTO_APPROVAL: tuple[str, ...] = (
 #: expensive mistakes live.
 DECISION_BEARING: tuple[str, ...] = (
     *REQUIRED_FOR_AUTO_APPROVAL,
+    # Not a commercial term, but the input to counterparty resolution -- so a
+    # value read off a scan and never checked decides which supplier this is.
+    "counterparty_registration_id",
     "auto_renewal",
     "termination_notice_days",
     "liability_cap",
