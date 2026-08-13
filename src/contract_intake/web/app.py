@@ -97,7 +97,15 @@ def costs() -> dict[str, Any]:
 def review_queue(request: Request, state: str = "open") -> Any:
     with session_scope() as session:
         rows = review.queue(session, state=state)
-    return templates.TemplateResponse(request, "queue.html", {"rows": rows, "state": state})
+    return templates.TemplateResponse(
+        request,
+        "queue.html",
+        {
+            "rows": rows,
+            "state": state,
+            "stats": review.dashboard(session),
+        },
+    )
 
 
 @app.get("/review/{item_id}", response_class=HTMLResponse)

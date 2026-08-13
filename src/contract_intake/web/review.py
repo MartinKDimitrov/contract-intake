@@ -318,3 +318,36 @@ def _reason_weight(reason: dict[str, Any]) -> tuple[int, str]:
         "low_severity_finding": 10,
     }
     return rank.get(str(reason.get("rule")), 9), str(reason.get("message", ""))
+
+
+def dashboard(session: Session) -> dict[str, Any]:
+    """The four numbers a reviewer wants before the list itself.
+
+    Deliberately four, and deliberately these: how much is waiting, how much
+    went through without anyone, how much this cost, and how much of it nothing
+    could check. The last is the one a queue view usually hides.
+    """
+    from contract_intake.db.models import Attachment, Contract, LLMCall
+
+    spent = session.scalar(select(func.coalesce(func.sum(LLMCall.usd), 0.0))) or 0.0
+    delivered = (
+        session.scalar(
+            select(func.count()).select_from(Attachment).where(Attachment.status == "delivered")
+        )
+        or 0
+    )
+    scans = sum(
+        1
+        for row in session.scalars(select(Extraction)).all()
+        if any(p.get("status") == "unverifiable" for p in row.fields.get("_provenance", []))
+    )
+    return {
+        "open": session.scalar(
+            select(func.count()).select_from(ReviewItem).where(ReviewItem.state == "open")
+        )
+        or 0,
+        "filed": session.scalar(select(func.count()).select_from(Contract)) or 0,
+        "usd": spent,
+        "usd_each": spent / delivered if delivered else 0.0,
+        "unverifiable": scans,
+    }

@@ -20,7 +20,8 @@
 
 <h2>Why this needs a person</h2>
 {% for reason in view.reasons %}
-  <div class="card">
+  {# Reasons arrive weighted, so the first is the one that decided the outcome. #}
+  <div class="card{{ ' high' if loop.first }}">
     {% if reason.citation %}<span class="cite mono">{{ reason.citation }}</span>{% endif %}
     {{ reason.message }}
     <div class="muted mono" style="margin-top:4px">{{ reason.rule }}</div>
@@ -32,7 +33,7 @@
 <h2>Extracted terms</h2>
 <table>
   <thead>
-    <tr><th>Field</th><th>Value</th><th>Confidence</th><th>Evidence</th></tr>
+    <tr><th>Field</th><th>Value</th><th>Confidence</th><th>Evidence</th><th>Status</th></tr>
   </thead>
   <tbody>
   {% for f in view.fields %}
@@ -44,14 +45,17 @@
       </td>
       <td class="mono">{{ '%.2f'|format(f.confidence) }}</td>
       <td>
+        {% if f.quote %}
+          <span class="quote">&ldquo;{{ f.quote[:200] }}&rdquo;</span>
+          {%- if f.page %} <span class="muted mono">p{{ f.page }}</span>{% endif %}
+        {% else %}<span class="muted">&mdash;</span>{% endif %}
+      </td>
+      <td style="white-space:nowrap">
         {% if f.verified %}<span class="tag ok">verified</span>
         {% elif f.suspect %}<span class="tag high">not in document</span>
         {% elif f.provenance == 'unverifiable' %}<span class="tag medium">scan</span>
+        {% elif f.provenance == 'absent' %}<span class="tag">absent</span>
         {% else %}<span class="muted">&mdash;</span>{% endif %}
-        {% if f.quote %}
-          <div class="quote">&ldquo;{{ f.quote[:220] }}&rdquo;
-            {%- if f.page %} <span class="muted">p{{ f.page }}</span>{% endif %}</div>
-        {% endif %}
       </td>
     </tr>
   {% endfor %}

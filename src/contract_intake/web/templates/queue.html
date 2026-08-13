@@ -3,6 +3,14 @@
 {% block body %}
 
 <h1>Review queue</h1>
+
+<div class="stats">
+  <div><b>{{ stats.open }}</b><span>awaiting a person</span></div>
+  <div><b>{{ stats.filed }}</b><span>contracts filed</span></div>
+  <div><b>${{ '%.4f'|format(stats.usd_each) }}</b><span>per document</span></div>
+  <div><b>{{ stats.unverifiable }}</b><span>with values nothing could check</span></div>
+</div>
+
 <p class="sub">
   {{ rows|length }} item{{ '' if rows|length == 1 else 's' }} awaiting a decision.
   Showing <b>{{ state }}</b> &middot;
