@@ -6,9 +6,10 @@ contracting playbook, and routes the result: clean and on-policy contracts are
 stored, anything uncertain or off-policy goes to a human with the specific reason
 attached.
 
-> **Status: phase 3 of 8.** Mail arrives, is triaged for free, loaded per page,
-> and extracted with verified provenance; the knowledge base is in place. The
-> agent that uses it lands next. See [Development plan](#development-plan).
+> **Status: phase 4 of 8.** Mail arrives, is triaged for free, loaded per page,
+> extracted with verified provenance, and reviewed by an agent that cites the
+> playbook section behind every finding. Routing and the review queue land
+> next. See [Development plan](#development-plan).
 
 ## Why vendor contracts
 
@@ -123,8 +124,8 @@ curl :8000/metrics/costs
 | 1 | Email intake, triage, deduplication | ✅ done |
 | 2 | Document loading, extraction with provenance | ✅ done |
 | 3 | Knowledge base: vendor registry + policy playbook | ✅ done |
-| 4 | Agent loop with knowledge-base tools | next |
-| 5 | Deterministic routing, storage, review UI | |
+| 4 | Agent loop with knowledge-base tools | ✅ done |
+| 5 | Deterministic routing, storage, review UI | next |
 | 6 | Failure paths, retries, dead letters | |
 | 7 | Eval harness: extraction accuracy, KB contribution, effort sweep | |
 | 8 | Documentation and walkthrough recording | |

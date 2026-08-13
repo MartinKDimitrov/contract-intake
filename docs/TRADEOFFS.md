@@ -181,6 +181,47 @@ that cannot be unit-tested, cannot be audited by a lawyer, and drifts between
 model versions. `payment_terms_days > ceiling -> needs_review, citing S3.2` can
 be tested exhaustively and explained in one sentence.
 
+### Trimming tool results, not dropping them
+
+**Chose:** every policy hit comes back with its clause body, capped at ~420
+characters.
+
+**Instead of:** returning the body of the top hit only, and just a section and
+title for the runners-up.
+
+**Why:** the agent loop resends every tool result on every later turn, so a
+verbose result is paid for repeatedly -- the first version of this stage spent
+$0.167 on one contract, with 16k input tokens. Returning only the top hit's text
+cut that to $0.115.
+
+It also lost a real deviation. For "renews automatically", §2.1 *Initial term*
+scored 0.475 and §2.2 *Automatic renewal* scored 0.474 -- a margin of 0.001. The
+agent was handed the wrong clause in full and the right one as a bare title, and
+did not record the finding. A title names the topic; only the body carries the
+rule.
+
+Trimming instead of dropping came to $0.105 -- cheaper than both -- with the
+deviation back. The lesson is specific enough to be worth writing down:
+**retrieval at these margins is not reliable enough to decide which hit is worth
+reading.** Trimming is the safe economy; dropping is not.
+
+**Cost:** ~1.2k tokens per search instead of ~500.
+
+**Stops being right when:** the playbook grows to clauses long enough that 420
+characters truncates the rule itself rather than its rationale.
+
+### Caching the agent's conversation
+
+**Chose:** top-level `cache_control` on the tool-runner call, not just on the
+system prompt.
+
+**Why:** the runner resends the whole conversation each iteration, so input cost
+grows quadratically in turns. With the history cached, input tokens on a
+13-tool-call review fell from 16,462 to 6 -- everything else is a cache read.
+
+**Consequence:** output tokens now dominate the agent's bill at roughly 65%.
+Further savings have to come from thinking depth, not from context size.
+
 ### Extraction and enrichment are separate calls
 
 **Chose:** one deterministic structured-output call, then a separate agent loop.
