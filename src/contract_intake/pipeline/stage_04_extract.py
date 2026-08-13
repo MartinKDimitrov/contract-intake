@@ -18,8 +18,8 @@ that knows and one that guessed, and the only honest input to stage 06.
 
 *No tools here.* Extraction is a single deterministic call so its accuracy can
 be measured on its own in evals/, without agent non-determinism in the way.
-Validation against the knowledge base is stage 05's job. Fused, neither would
-be measurable -- and two of the five review criteria are those measurements.
+Validation against the knowledge base is stage 05's job; fused, neither number
+would mean anything.
 
 Cost: the system prompt and JSON schema form a stable cached prefix, so from the
 second document onwards that span bills at roughly a tenth of the input rate.

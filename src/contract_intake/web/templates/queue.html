@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}review queue{% endblock %}
+{% block body %}
+
+<h1>Review queue</h1>
+<p class="sub">
+  {{ rows|length }} item{{ '' if rows|length == 1 else 's' }} awaiting a decision.
+  Showing <b>{{ state }}</b> &middot;
+  <a href="/?state=all" class="muted">all</a> &middot;
+  <a href="/?state=approved" class="muted">approved</a> &middot;
+  <a href="/?state=rejected" class="muted">rejected</a>
+</p>
+
+{% if not rows %}
+  <p class="empty">Nothing here. Every contract processed so far met the playbook.</p>
+{% else %}
+<table>
+  <thead>
+    <tr>
+      <th>Document</th>
+      <th>Counterparty</th>
+      <th>Why it stopped</th>
+      <th>Reasons</th>
+      <th>Received</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for row in rows %}
+    <tr>
+      <td>
+        <a class="row" href="/review/{{ row.item_id }}">{{ row.filename }}</a>
+        <div class="muted mono">{{ row.sender }}</div>
+      </td>
+      <td class="mono">{{ row.counterparty }}</td>
+      <td>{{ row.top_reason[:110] }}{% if row.top_reason|length > 110 %}&hellip;{% endif %}</td>
+      <td>{{ row.reason_count }}</td>
+      <td class="muted mono">{{ row.created_at.strftime('%d %b %H:%M') }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

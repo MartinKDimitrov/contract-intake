@@ -19,6 +19,7 @@ setup: .venv  ## Create venv and install the project with dev extras
 	$(PIP) install --quiet -e ".[dev]"
 	@echo "fetching the embedding model (~80MB, once)..."
 	@$(PY) -m contract_intake.cli knowledge --build >/dev/null
+	@$(PY) evals/fixtures/generate.py >/dev/null
 	@echo "ready. copy .env.example to .env and fill in ANTHROPIC_API_KEY"
 
 .PHONY: test

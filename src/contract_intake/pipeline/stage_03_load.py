@@ -21,8 +21,8 @@ rather than hiding inside extraction:
     reads them reliably, which is measured in evals/ rather than assumed.
 
 No OCR engine. Pages without a text layer go to the model as images and Claude
-reads them directly. That removes a system-level dependency (tesseract) from
-the reviewer's setup and, on noisy scans, reads better than OCR-then-text.
+reads them directly. That drops a system-level dependency (tesseract) and, on
+noisy scans, reads better than OCR-then-text.
 """
 
 from __future__ import annotations

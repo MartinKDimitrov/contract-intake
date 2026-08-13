@@ -53,8 +53,8 @@ oldest row in a non-terminal status.
 
 **Instead of:** Celery/RQ with Redis, or an in-process `asyncio.Queue`.
 
-**Why:** a broker is a second piece of infrastructure that solves none of the
-review criteria. Durable status in the database gives crash resumption for free
+**Why:** a broker is a second piece of infrastructure that buys nothing here.
+Durable status in the database gives crash resumption for free
 — a document interrupted mid-extraction is picked up at exactly that phase — and
 the entire system state is one `sqlite3` query away. An in-memory queue would
 lose work on restart, which is strictly worse than both.
@@ -80,8 +80,8 @@ turns a silent stall into a startup crash.
 
 **Chose:** SQLite in WAL mode, one file under `var/`.
 
-**Why:** the distance between `git clone` and a working demo is itself a
-deliverable. WAL gives the review UI a concurrent reader while the worker
+**Why:** nothing to provision, and one file to inspect or delete. WAL gives the
+review UI a concurrent reader while the worker
 writes, which is the only concurrency this design actually needs.
 
 **Cost:** single-writer. No `SKIP LOCKED`. Type affinity rather than real types.
@@ -108,10 +108,9 @@ embedding model.
 **Instead of:** `sqlite-vec` (one datastore instead of two), or a plain NumPy
 array (honestly sufficient at this size).
 
-**Why:** the task calls for a vector store, and Chroma is a real one with no
-server and no operational burden. Its built-in embedder means no extra
-dependency at all — importantly, no PyTorch, which would have added ~2 GB to a
-setup step a reviewer has to run.
+**Why:** a real vector store with no server to run and no operational burden.
+Its built-in embedder means no extra dependency at all — importantly no PyTorch,
+which would have added ~2 GB to an install.
 
 **Cost:** heavier dependency than the data justifies; retrieval quality is
 marginally below a dedicated e5-class model, which is immaterial across 15
@@ -143,8 +142,8 @@ the wrapper has to be kept in step with SDK changes.
 
 **Chose:** `rates_for()` raises rather than defaulting to zero.
 
-**Why:** a silently unpriced call makes the ledger a lie, and the ledger is a
-deliverable. Better to fail on an unknown model than to under-report.
+**Why:** a silently unpriced call makes the ledger under-report, and an
+under-reporting ledger is worse than none. Better to fail on an unknown model.
 
 ### Per-page text-vs-vision decision
 
@@ -161,8 +160,8 @@ them.
 
 **Instead of:** Tesseract via `pytesseract`.
 
-**Why:** removes a system-level dependency from the reviewer's setup, and on
-noisy scans direct vision reads better than OCR-then-text. We are already paying
+**Why:** drops a system-level dependency, and on noisy scans direct vision reads
+better than OCR-then-text. We are already paying
 for a vision-capable model.
 
 **Cost:** image pages are the expensive path, so this trades tokens for
@@ -180,6 +179,59 @@ rules decide.
 that cannot be unit-tested, cannot be audited by a lawyer, and drifts between
 model versions. `payment_terms_days > ceiling -> needs_review, citing S3.2` can
 be tested exhaustively and explained in one sentence.
+
+### Deterministic thresholds, and calling the agent only when they pass
+
+**Chose:** every playbook threshold that can be written as a comparison lives in
+`playbook_checks.json` and is evaluated in Python. The agent runs only for
+documents that pass all of them.
+
+**Instead of:** the agent retrieving each clause, reading the numbers out of
+prose, and doing the comparison itself.
+
+**How we got here.** The first working version put everything through the model.
+It produced good findings, each citing a section, and cost about $0.105 per
+document for enrichment alone — 71% of a $0.147 total, with output tokens making
+up 55% of that. Two attempts to reduce it went nowhere useful. Trimming tool
+results saved 31% and cost a real deviation (recorded above). Moving enrichment
+to a cheaper model was measured properly: 6.7x cheaper, but it missed the
+subtlest finding and added a false positive, and the two errors are not
+symmetric — a spurious finding costs a reviewer thirty seconds, while a missed
+one can let a contract with no exit right auto-approve silently.
+
+Looking at what the agent actually did on a typical document made the answer
+obvious. For §1.1 it retrieved the clause, read "45 to 90 days", compared it to
+90, and decided. That is arithmetic, performed by a frontier model,
+non-deterministically, in a system whose stated principle is that the model
+proposes and the code decides. The principle was only half true.
+
+**Why this is not only cheaper.** Anything expressible as a comparison is now
+exhaustively testable and produces identical output every run. What remains with
+the agent is what a comparison cannot carry: that a 90-day non-renewal window is
+not a termination-for-convenience right; that the registry implies an obligation
+the contract is silent about; that a clause is simply unusual.
+
+**Measured:** enrichment falls to $0 for a document that already fails a check,
+and the agent's own work shrank from 8–13 tool calls to 5–6 once its prompt said
+the numeric thresholds were already settled. Per document: $0.147 → $0.105 when
+everything passes, → $0.074 at a 50% deviation rate, → $0.061 at 70%. The worse
+the incoming stream, the cheaper it runs, because bad contracts are caught for
+nothing.
+
+**Cost, honestly:** skipping the agent on a document that already failed a check
+forfeits its judgement findings for that document. The §2.3 observation — that
+the deviations fixture has no termination-for-convenience right at all — no
+longer appears, because four other checks stopped it first. The defence is that
+the document is going to a human with four citations anyway, and a lawyer reading
+it will see the missing clause. That is a defence, not a free lunch.
+
+There are now two files encoding the same policy: `playbook.md` for the agent to
+retrieve and a human to maintain, and `playbook_checks.json` for the machine.
+They can drift. A test asserts every section cited by a check exists in the prose.
+
+**Stops being right when:** the checkable rules grow complex enough that the JSON
+becomes a small programming language. At that point they should be Python
+functions in `policy/`, tested directly, rather than data.
 
 ### Trimming tool results, not dropping them
 
@@ -243,8 +295,8 @@ round-tripped through the database.
 
 **Chose:** stdlib `venv` and `pip`, driven by `make setup`.
 
-**Why:** `uv` is faster and nicer, and requires the reviewer to install it
-first. Nothing should stand between `git clone` and a running system.
+**Why:** `uv` is faster and nicer, and is one more thing to install first.
+Nothing should stand between `git clone` and a running system.
 
 ### Python 3.12, not 3.14
 

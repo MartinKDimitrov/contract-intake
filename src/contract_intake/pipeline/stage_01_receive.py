@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 
 
 class ImapSource:
-    """Polls an IMAP folder. The demo path."""
+    """Polls an IMAP folder."""
 
     name: ClassVar[str] = "receive.imap"
     produces: ClassVar[Status] = Status.RECEIVED
@@ -69,8 +69,8 @@ class ImapSource:
 class WebhookSource:
     """Accepts provider-pushed mail (Mailgun-compatible multipart).
 
-    Same output shape as ImapSource. Present so intake is not welded to polling;
-    not on the demo path, since it needs a public URL.
+    Same output shape as ImapSource, so intake is not welded to polling. Needs a
+    publicly reachable URL, which the IMAP path does not.
     """
 
     name: ClassVar[str] = "receive.webhook"

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}contract intake{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #fbfbfa; --fg: #1c1c1a; --muted: #6b6b64; --line: #e3e2dd;
+      --card: #fff; --high: #b3261e; --med: #8a5a00; --low: #5a6b55; --ok: #2c6e49;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16161a; --fg: #e8e8e4; --muted: #9a9a92; --line: #2c2c32;
+        --card: #1d1d22; --high: #ef8a80; --med: #d9a441; --low: #9dbb92; --ok: #6fcf97;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+    }
+    header {
+      border-bottom: 1px solid var(--line); padding: 14px 24px;
+      display: flex; gap: 20px; align-items: baseline;
+    }
+    header b { font-weight: 600; letter-spacing: -.01em; }
+    header a { color: var(--muted); text-decoration: none; }
+    header a:hover { color: var(--fg); }
+    main { max-width: 1080px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em;
+         color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 12px; text-transform: uppercase;
+         letter-spacing: .05em; color: var(--muted); padding: 6px 10px;
+         border-bottom: 1px solid var(--line); font-weight: 600; }
+    td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    tr:hover td { background: var(--card); }
+    a.row { color: inherit; text-decoration: none; font-weight: 500; }
+    a.row:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid var(--line);
+            border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+    .tag { display: inline-block; font-size: 11px; padding: 1px 7px;
+           border-radius: 20px; border: 1px solid currentColor; font-weight: 600;
+           text-transform: uppercase; letter-spacing: .04em; }
+    .high { color: var(--high); } .medium { color: var(--med); }
+    .low { color: var(--low); } .ok { color: var(--ok); }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+    .quote { color: var(--muted); font-size: 13px; margin-top: 3px;
+             border-left: 2px solid var(--line); padding-left: 9px; }
+    .cite { font-weight: 600; margin-right: 6px; }
+    .muted { color: var(--muted); }
+    button { font: inherit; padding: 7px 15px; border-radius: 6px;
+             border: 1px solid var(--line); background: var(--card);
+             color: var(--fg); cursor: pointer; }
+    button.primary { border-color: var(--ok); color: var(--ok); font-weight: 600; }
+    button:hover { border-color: var(--fg); }
+    details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+    .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>contract intake</b>
+    <a href="/">queue</a>
+    <a href="/contracts">approved</a>
+    <a href="/metrics/costs">costs</a>
+  </header>
+  <main>{% block body %}{% endblock %}</main>
+</body>
+</html>

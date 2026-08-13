@@ -123,8 +123,8 @@ hereby agree as follows.
    automatically; renewal requires a written agreement of both parties.
 
 2. CHARGES AND PAYMENT
-   The Customer shall pay each undisputed invoice within thirty (30) days
-   of receipt.
+   The Customer shall pay each undisputed invoice within forty-five (45)
+   days of receipt.
 
 3. LIMITATION OF LIABILITY
    The aggregate liability of either party under this Agreement shall not

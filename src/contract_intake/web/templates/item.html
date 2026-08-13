@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ view.attachment.filename }}{% endblock %}
+{% block body %}
+
+<h1>{{ view.attachment.filename }}</h1>
+<p class="sub">
+  from <span class="mono">{{ view.email.sender if view.email else 'unknown' }}</span>
+  &middot; counterparty
+  <span class="mono">{{ view.counterparty_id or 'unresolved' }}</span>
+  {%- if view.counterparty_score %} ({{ '%.2f'|format(view.counterparty_score) }}){% endif %}
+  &middot; ${{ '%.4f'|format(view.usd) }} to process
+  &middot; <span class="tag">{{ view.item.state }}</span>
+</p>
+
+<h2>Why this needs a person</h2>
+{% for reason in view.reasons %}
+  <div class="card">
+    {% if reason.citation %}<span class="cite mono">{{ reason.citation }}</span>{% endif %}
+    {{ reason.message }}
+    <div class="muted mono" style="margin-top:4px">{{ reason.rule }}</div>
+  </div>
+{% else %}
+  <p class="muted">No rule fired.</p>
+{% endfor %}
+
+<h2>Extracted terms</h2>
+<table>
+  <thead>
+    <tr><th>Field</th><th>Value</th><th>Confidence</th><th>Evidence</th></tr>
+  </thead>
+  <tbody>
+  {% for f in view.fields %}
+    <tr>
+      <td class="mono">{{ f.name }}</td>
+      <td>
+        {% if f.value is none %}<span class="muted">not stated</span>
+        {% else %}{{ f.value }}{% if f.currency %} {{ f.currency }}{% endif %}{% endif %}
+      </td>
+      <td class="mono">{{ '%.2f'|format(f.confidence) }}</td>
+      <td>
+        {% if f.verified %}<span class="tag ok">verified</span>
+        {% elif f.suspect %}<span class="tag high">not in document</span>
+        {% elif f.provenance == 'unverifiable' %}<span class="tag medium">scan</span>
+        {% else %}<span class="muted">&mdash;</span>{% endif %}
+        {% if f.quote %}
+          <div class="quote">&ldquo;{{ f.quote[:220] }}&rdquo;
+            {%- if f.page %} <span class="muted">p{{ f.page }}</span>{% endif %}</div>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% if view.notes %}
+  <h2>Extractor notes</h2>
+  <div class="card muted">{{ view.notes }}</div>
+{% endif %}
+
+<h2>Findings</h2>
+{% for f in view.findings %}
+  <div class="card">
+    <span class="tag {{ f.severity }}">{{ f.severity }}</span>
+    <span class="cite mono">{{ f.citation }}</span>
+    <span class="mono muted">{{ f.field }}</span>
+    <div style="margin-top:6px">{{ f.explanation }}</div>
+  </div>
+{% else %}
+  <p class="muted">The agent recorded nothing.</p>
+{% endfor %}
+
+<h2>What the agent looked up</h2>
+{% if not view.consulted_knowledge_base %}
+  <div class="card high">
+    The agent recorded findings without consulting the registry or the playbook,
+    so they rest on its own priors rather than on this company's policy.
+  </div>
+{% endif %}
+<details>
+  <summary>{{ view.trace|length }} tool call{{ '' if view.trace|length == 1 else 's' }}</summary>
+  <table style="margin-top:10px">
+    <tbody>
+    {% for call in view.trace %}
+      <tr>
+        <td class="mono" style="width:190px">{{ call.tool }}</td>
+        <td>
+          <div class="mono">{{ call.input|tojson|truncate(150) }}</div>
+          <div class="quote mono">{{ call.output|tojson|truncate(220) }}</div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</details>
+
+{% if view.item.state == 'open' %}
+  <h2>Decide</h2>
+  <form method="post" action="/review/{{ view.item.id }}/resolve"
+        style="display:flex; gap:10px; align-items:center">
+    <button class="primary" name="action" value="approve">Approve as extracted</button>
+    <button name="action" value="reject">Reject</button>
+    <span class="muted">Your decision is recorded beside the machine's, not over it.</span>
+  </form>
+{% else %}
+  <h2>Resolved</h2>
+  <div class="card">
+    <b>{{ view.item.state }}</b> by {{ view.item.resolved_by }}
+    {% if view.item.resolved_at %}
+      on {{ view.item.resolved_at.strftime('%d %b %Y %H:%M') }}
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endblock %}

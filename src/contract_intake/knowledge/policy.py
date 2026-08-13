@@ -9,8 +9,8 @@ Chunked by section so a hit carries its own citation. A finding that says
 "deviates from §4.1" can be checked by a human in seconds; one that says
 "unusual jurisdiction" cannot.
 
-Chroma with its bundled ONNX embedder: a real vector store, file-based, no
-server, and no PyTorch in a reviewer's setup.
+Chroma with its bundled ONNX embedder: file-based, no server to run, and no
+PyTorch in the dependency tree.
 """
 
 from __future__ import annotations

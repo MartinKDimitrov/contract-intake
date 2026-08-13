@@ -1,12 +1,11 @@
 name: CI
 
-# The point of this workflow is not the badge. It is a clean-machine test of
-# `make setup`: the reviewer's first command is the one most likely to fail, and
-# a laptop with a warm pip cache proves nothing about a fresh checkout.
+# A clean-machine check of the full setup path. A developer laptop with a warm
+# pip cache proves nothing about a fresh checkout, and `make setup` is where a
+# broken environment shows up first.
 #
-# It needs no secrets. The suite is hermetic -- no API key, no network calls to
-# Anthropic -- which is what makes "the tests pass" mean the same thing here as
-# it does locally.
+# No secrets required: the suite is hermetic, with no API key and no calls to
+# Anthropic, so a green run here means the same thing it means locally.
 
 on:
   push:
@@ -29,8 +28,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          # Only the runner's own Python is cached here; the project installs
-          # into its own venv via `make setup`, exactly as a reviewer would.
+          # Only the runner's own Python is cached; the project installs into
+          # its own venv via `make setup`, on the same path as a fresh clone.
           cache: pip
 
       # Chroma downloads an ONNX embedding model on first use. Cached so the
@@ -50,8 +49,8 @@ jobs:
       - name: make test
         run: make test
 
-      # The fixtures are generated, not committed as binaries, so the generator
-      # has to keep working. It is also what the eval harness runs on.
+      # Fixtures are generated rather than committed as binaries, so the
+      # generator has to keep working -- the eval harness runs on its output.
       - name: Regenerate the fixtures
         run: .venv/bin/python evals/fixtures/generate.py
 

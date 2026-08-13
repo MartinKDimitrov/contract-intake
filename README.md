@@ -8,11 +8,6 @@ contracting playbook, and routes the result: clean and on-policy contracts are
 stored, anything uncertain or off-policy goes to a human with the specific reason
 attached.
 
-> **Status: phase 4 of 8.** Mail arrives, is triaged for free, loaded per page,
-> extracted with verified provenance, and reviewed by an agent that cites the
-> playbook section behind every finding. Routing and the review queue land
-> next. See [Development plan](#development-plan).
-
 ## Why vendor contracts
 
 Extraction alone does not need a knowledge base. Contract intake does, and for
@@ -25,9 +20,9 @@ two different reasons:
   is wrong *against this company's playbook*, which caps them at 45. No amount
   of model reasoning supplies that fact.
 
-The second is the honest test of whether retrieval improves the result or just
-decorates it, and the eval harness measures it by running the agent with and
-without knowledge-base access.
+The second is the one retrieval is actually load-bearing for, so the eval
+harness measures it directly, by running the agent with and without
+knowledge-base access.
 
 ## Quickstart
 
@@ -118,19 +113,17 @@ make costs          # the ledger, aggregated
 curl :8000/metrics/costs
 ```
 
-## Development plan
+## Roadmap
 
-| Phase | | Status |
-|---|---|---|
-| 0 | Skeleton: pipeline contract, state machine, cost ledger, DB | ✅ done |
-| 1 | Email intake, triage, deduplication | ✅ done |
-| 2 | Document loading, extraction with provenance | ✅ done |
-| 3 | Knowledge base: vendor registry + policy playbook | ✅ done |
-| 4 | Agent loop with knowledge-base tools | ✅ done |
-| 5 | Deterministic routing, storage, review UI | next |
-| 6 | Failure paths, retries, dead letters | |
-| 7 | Eval harness: extraction accuracy, KB contribution, effort sweep | |
-| 8 | Documentation and walkthrough recording | |
+Working today: intake, triage, per-page loading, extraction with verified
+provenance, deterministic playbook checks, agent review for what a check cannot
+express, rule-based routing and a human review queue.
+
+Still open:
+
+- retry and dead-letter handling for the remaining failure paths
+- an eval harness measuring extraction accuracy, the knowledge base's
+  contribution, and the effort/cost curve
 
 ## Stack
 
