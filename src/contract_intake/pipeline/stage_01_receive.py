@@ -158,12 +158,8 @@ def _persist_attachment(
     # read. Intake is a Source rather than a Stage, so it announces itself.
     seen = session.scalar(select(Attachment).where(Attachment.sha256 == digest))
     if seen is not None:
-        log.info(
-            "%-34s %-11s x  identical to attachment %d; not reprocessing",
-            attachment.filename[:34],
-            "01 receive",
-            seen.id,
-        )
+        log.info("\n%s", attachment.filename)
+        log.info("  %-11s x  identical to attachment %d; not reprocessing", "01 receive", seen.id)
         return None
 
     settings.ensure_dirs()
@@ -182,13 +178,12 @@ def _persist_attachment(
     )
     session.add(row)
     session.flush()
+    log.info("\n%s", attachment.filename)
     log.info(
-        "%-34s %-11s -> stored as attachment %d, %.1f KB, sha256 %s",
-        attachment.filename[:34],
+        "  %-11s -> %-62s",
         "01 receive",
-        row.id,
-        attachment.size_bytes / 1024,
-        digest[:12],
+        f"stored as attachment {row.id}, {attachment.size_bytes / 1024:.1f} KB, "
+        f"sha256 {digest[:12]}",
     )
     return row.id
 

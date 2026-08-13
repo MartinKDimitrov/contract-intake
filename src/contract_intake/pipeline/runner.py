@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Final
@@ -212,9 +213,23 @@ async def advance(
 _MARK = {"advanced": "->", "rejected": "x ", "failed": "! "}
 
 
-def _announce(attachment: Attachment, stage: Stage | None, outcome: StageOutcome) -> None:
-    """One line per document per phase, with the phase's own answer."""
-    name = (attachment.filename or "?")[:34]
+def _announce(
+    attachment: Attachment,
+    stage: Stage | None,
+    outcome: StageOutcome,
+    elapsed_ms: float,
+    announced: int | None,
+) -> int:
+    """One line per phase, under the document's name written once.
+
+    The name repeated on every line is six copies of what a reader already
+    knows; the phase, its answer and what it cost in time are what changes.
+    Returns the document just announced, so the caller can tell when to write a
+    new heading.
+    """
+    if attachment.id != announced:
+        log.info("\n%s", attachment.filename or "?")
+
     phase = f"{stage.number:02d} {stage.name}" if stage else "??"
 
     match outcome:
@@ -228,7 +243,15 @@ def _announce(attachment: Attachment, stage: Stage | None, outcome: StageOutcome
         case _:  # pragma: no cover - the match above is exhaustive
             mark, detail = "? ", ""
 
-    log.info("%-34s %-11s %s %s", name, phase, mark, detail)
+    # Detail is truncated rather than wrapped: the timing column has to stay
+    # in the same place down the page or it stops being a column.
+    log.info("  %-11s %s %-74s %7s", phase, mark, detail[:74], _duration(elapsed_ms))
+    return attachment.id
+
+
+def _duration(ms: float) -> str:
+    """Milliseconds under a second, seconds above it. Nobody reads 4821ms."""
+    return f"{ms:.0f}ms" if ms < 1000 else f"{ms / 1000:.1f}s"
 
 
 def _discard(savepoint: SessionTransaction) -> None:
@@ -372,14 +395,17 @@ async def drain(
     checked before every model call and on every agent iteration.
     """
     moved = finished = 0
+    announced: int | None = None
     while moved < max_transitions:
         attachment = pick_next(session)
         if attachment is None:
             break
         stage = STAGE_BY_CONSUMES.get(Status(attachment.status))
+        started = time.perf_counter()
         outcome = await advance(attachment, session=session, settings=settings, llm=llm)
+        elapsed_ms = (time.perf_counter() - started) * 1000
         session.commit()
-        _announce(attachment, stage, outcome)
+        announced = _announce(attachment, stage, outcome, elapsed_ms, announced)
         moved += 1
         if is_terminal(Status(attachment.status)):
             finished += 1
