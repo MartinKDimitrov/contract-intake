@@ -40,31 +40,70 @@ ACCEPTED_KINDS = frozenset({FileKind.PDF}) | IMAGE_KINDS
 #: Below this an image is a logo or an email signature, not a document page.
 MIN_IMAGE_BYTES = 50_000
 
-CONTRACT_TERMS: tuple[str, ...] = (
+#: Words that mark a legal instrument. A document without one of these is not a
+#: contract, whatever else it says.
+STRONG_TERMS: tuple[str, ...] = (
+    # English
     "agreement",
-    "contract",
-    "party",
-    "parties",
-    "hereby",
     "whereas",
-    "effective date",
-    "termination",
-    "terminate",
-    "liability",
-    "indemnif",
+    "the parties",
+    "both parties",
     "governing law",
-    "confidential",
-    "warrant",
-    "obligations",
-    "clause",
     "in witness whereof",
     "counterparts",
+    "shall be governed",
+    "effective date",
+    "termination",
+    "indemnif",
+    "confidential",
+    # Bulgarian
+    "настоящия договор",
+    "настоящият договор",
+    "сключиха настоящия",
+    "страните се споразумяха",
+    "приложимо право",
+    "конфиденциалн",
+    # German
+    "dieser vertrag",
+    "vereinbaren die parteien",
+    "anwendbares recht",
+    "zwischen den parteien",
+)
+
+#: Commercial vocabulary that supports a classification but cannot carry it. An
+#: acceptance protocol names a supplier and a vendor too.
+SUPPORTING_TERMS: tuple[str, ...] = (
+    # "hereby" belongs here, not above: certificates, declarations and
+    # affidavits use it just as readily as contracts do.
+    "hereby",
     "supplier",
     "vendor",
     "services",
+    "clause",
+    "obligations",
+    "warrant",
+    "liability",
+    "party",
+    "contract",
+    "договор",
+    "споразумение",
+    "страните",
+    "доставчик",
+    "услуги",
+    "клауза",
+    "задължения",
+    "прекратяване",
+    "vertrag",
+    "vereinbarung",
+    "parteien",
+    "kündigung",
+    "lieferant",
+    "leistungen",
+    "haftung",
 )
 
 INVOICE_TERMS: tuple[str, ...] = (
+    # English
     "invoice",
     "invoice no",
     "invoice number",
@@ -76,10 +115,75 @@ INVOICE_TERMS: tuple[str, ...] = (
     "payment due",
     "remit to",
     "order total",
+    "credit note",
+    "quotation",
+    "quote ref",
+    "purchase order",
+    "po number",
+    # Bulgarian
+    "фактура",
+    "данъчна основа",
+    "ддс",
+    "сума за плащане",
+    "ед. цена",
+    "получател",
+    "кредитно известие",
+    "оферта",
 )
 
-#: Two hits is enough that a lone stray word does not carry a document through.
-MIN_CONTRACT_HITS = 2
+#: Document types that are not contracts however they are worded. A certificate
+#: attests, a declaration asserts, a resolution records -- none of them create
+#: obligations between parties, and each says so in its own title.
+#:
+#: Matched against the opening of the document only. A real contract may well
+#: require a certificate of insurance in clause 7, and that must not disqualify
+#: it; a document that *is* a certificate announces the fact at the top.
+DISQUALIFYING_TERMS: tuple[str, ...] = (
+    "certificate of",
+    "certificate no",
+    "certificate registration",
+    "certificate of registration",
+    "hereby certifies",
+    "certification body",
+    "declaration of",
+    "hereby declare",
+    "we declare",
+    "board resolution",
+    "board decision",
+    "the board of directors resolves",
+    "audit report",
+    "audit summary",
+    "audit reference",
+    "inspection report",
+    "maintenance report",
+    "inspection and maintenance",
+    "acceptance protocol",
+    "policy period",
+    "сертификат",
+    "декларация",
+    "протокол",
+    "решение на съвета",
+    # Procurement notices: an announcement about a contract, not a contract.
+    "contract notice",
+    "award notice",
+    "prior information notice",
+    "обявление за поръчка",
+    "обявление за възложена",
+    "състезателна процедура",
+    "auftragsbekanntmachung",
+    "bekanntmachung",
+    "vergabebekanntmachung",
+    "notice on ted",
+    "official journal",
+)
+
+#: How much of the document counts as its heading.
+HEADER_CHARS = 320
+
+#: A contract needs one instrument marker plus something else -- a lone
+#: "agreement" in a certificate's scope description is not enough.
+MIN_STRONG_HITS = 1
+MIN_TOTAL_HITS = 2
 
 
 class TriageStage:
@@ -185,17 +289,29 @@ def classify_text(text: str) -> TextVerdict:
     not to be right about hard cases -- those go on to the model, which is what
     it is for.
     """
-    lowered = text.lower()
-    contract_hits = [term for term in CONTRACT_TERMS if term in lowered]
-    invoice_hits = [term for term in INVOICE_TERMS if term in lowered]
+    lowered = text.casefold()
 
-    if len(invoice_hits) >= 2 and len(invoice_hits) > len(contract_hits):
-        return TextVerdict("invoice", f"invoice terms: {', '.join(invoice_hits[:3])}")
-    if len(contract_hits) >= MIN_CONTRACT_HITS:
-        return TextVerdict("contract", f"terms: {', '.join(contract_hits[:3])}")
+    header = lowered[:HEADER_CHARS]
+    disqualifying = [t for t in DISQUALIFYING_TERMS if t in header]
+    if disqualifying:
+        return TextVerdict(
+            "unknown", f"declares itself a {disqualifying[0]!r} document, not an agreement"
+        )
+
+    strong = [t for t in STRONG_TERMS if t in lowered]
+    supporting = [t for t in SUPPORTING_TERMS if t in lowered]
+    invoice = [t for t in INVOICE_TERMS if t in lowered]
+
+    if len(invoice) >= 2 and len(invoice) > len(strong):
+        return TextVerdict("invoice", f"invoice terms: {', '.join(invoice[:3])}")
+
+    if len(strong) >= MIN_STRONG_HITS and len(strong) + len(supporting) >= MIN_TOTAL_HITS:
+        return TextVerdict("contract", f"terms: {', '.join((strong + supporting)[:3])}")
+
     return TextVerdict(
         "unknown",
-        f"{len(contract_hits)} contract term(s), {len(invoice_hits)} invoice term(s)",
+        f"{len(strong)} instrument marker(s), {len(supporting)} supporting, "
+        f"{len(invoice)} invoice term(s)",
     )
 
 

@@ -24,6 +24,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "ruff>=0.7",
     "mypy>=1.13",
+    "fpdf2>=2.8",
 ]
 
 [project.scripts]
@@ -51,6 +52,12 @@ ignore = ["ANN401"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ANN"]
+# The triage vocabulary is deliberately multilingual, so Cyrillic letters that
+# look like Latin ones are the point rather than a mistake. The risk RUF001
+# guards against -- a homoglyph that silently never matches -- is covered
+# instead by the corpus check, which runs the vocabulary against real Bulgarian
+# documents.
+"src/contract_intake/pipeline/stage_02_triage.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"
