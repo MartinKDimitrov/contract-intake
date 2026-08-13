@@ -62,6 +62,10 @@ class FieldView:
     # fmt: on
 
     @property
+    def label(self) -> str:
+        return label_for(self.name)
+
+    @property
     def verified(self) -> bool:
         return self.provenance == "verified"
 
@@ -94,6 +98,53 @@ class ItemView:
     @property
     def route(self) -> Route:
         return Route(self.decision.route)
+
+    @property
+    def concerns(self) -> list[dict[str, Any]]:
+        """One entry per thing that is wrong, not one per rule that noticed it.
+
+        Rules overlap by design -- a governing law outside the allow-list trips
+        the playbook check, the confidence floor and the quote verifier, and a
+        reviewer got three cards saying the same thing in three vocabularies.
+        Grouping by the field turns that into one heading with the specific
+        problems under it, and leaves whole-document reasons on their own.
+        """
+        by_field: dict[str, dict[str, Any]] = {}
+        order: list[str] = []
+
+        for reason in self.reasons:
+            fields = [f for f in reason.get("fields", ()) if f] or ["_document"]
+            for name in fields:
+                if name not in by_field:
+                    by_field[name] = {
+                        "field": None if name == "_document" else name,
+                        "label": "This document" if name == "_document" else label_for(name),
+                        "citations": [],
+                        "lines": [],
+                    }
+                    order.append(name)
+                entry = by_field[name]
+                citation = str(reason.get("citation") or "")
+                if citation and citation not in entry["citations"]:
+                    entry["citations"].append(citation)
+                line = str(reason.get("message") or "")
+                # Rule messages are prefixed with the field they concern, which
+                # is now the heading; repeating it reads as a stutter.
+                for prefix in (f"{name}: ", f"{label_for(name)}: "):
+                    if line.startswith(prefix):
+                        line = line[len(prefix) :]
+                if line and line not in entry["lines"]:
+                    entry["lines"].append(line)
+
+        return [by_field[name] for name in order]
+
+    @property
+    def provenance_counts(self) -> dict[str, int]:
+        """How the evidence divides: checked, unverifiable, invented, absent."""
+        counts = {"verified": 0, "unverifiable": 0, "not_found": 0, "absent": 0}
+        for f in self.fields:
+            counts[f.provenance] = counts.get(f.provenance, 0) + 1
+        return counts
 
     @property
     def agent_ran(self) -> bool:
@@ -218,6 +269,30 @@ def build_fields(extraction: dict[str, Any]) -> list[FieldView]:
             )
         )
     return out
+
+
+#: What a field is called to a person. The schema names are the column names a
+#: downstream system reads; a reviewer should not have to translate
+#: `counterparty_registration_id` in their head twenty times a day.
+LABELS: dict[str, str] = {
+    "counterparty_name": "Counterparty",
+    "counterparty_registration_id": "Registration number",
+    "customer_name": "Our side",
+    "effective_date": "Effective date",
+    "term_months": "Initial term",
+    "auto_renewal": "Automatic renewal",
+    "termination_notice_days": "Notice to terminate",
+    "payment_terms_days": "Payment terms",
+    "liability_cap": "Liability cap",
+    "liability_uncapped": "Liability excluded",
+    "governing_law": "Governing law",
+    "dpa_present": "Data processing agreement",
+    "signatories": "Signatories",
+}
+
+
+def label_for(name: str) -> str:
+    return LABELS.get(name, name.replace("_", " ").capitalize())
 
 
 #: Prefix a form field carries when it is an editable extracted value.

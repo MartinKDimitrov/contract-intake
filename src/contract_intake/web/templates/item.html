@@ -19,18 +19,36 @@
 </p>
 
 <h2>Why this needs a person</h2>
-{% for reason in view.reasons %}
-  {# Reasons arrive weighted, so the first is the one that decided the outcome. #}
+{% for c in view.concerns %}
+  {# Concerns arrive weighted, so the first is the one that decided the outcome. #}
   <div class="card{{ ' high' if loop.first }}">
-    {% if reason.citation %}<span class="cite mono">{{ reason.citation }}</span>{% endif %}
-    {{ reason.message }}
-    <div class="muted mono" style="margin-top:4px">{{ reason.rule }}</div>
+    <div class="concern-head">
+      <b>{{ c.label }}</b>
+      {% for citation in c.citations %}<span class="cite mono">{{ citation }}</span>{% endfor %}
+    </div>
+    {% for line in c.lines %}<div class="concern-line">{{ line }}</div>{% endfor %}
   </div>
 {% else %}
   <p class="muted">No rule fired.</p>
 {% endfor %}
 
 <h2>Extracted terms</h2>
+{% set p = view.provenance_counts %}
+{% set total = p.verified + p.unverifiable + p.not_found + p.absent %}
+{% if total %}
+  <div class="bar">
+    {% if p.verified %}<span class="ok" style="flex:{{ p.verified }}"></span>{% endif %}
+    {% if p.unverifiable %}<span class="warn" style="flex:{{ p.unverifiable }}"></span>{% endif %}
+    {% if p.not_found %}<span class="bad" style="flex:{{ p.not_found }}"></span>{% endif %}
+    {% if p.absent %}<span class="none" style="flex:{{ p.absent }}"></span>{% endif %}
+  </div>
+  <p class="legend">
+    <span><i class="ok"></i>{{ p.verified }} checked against the document</span>
+    <span><i class="warn"></i>{{ p.unverifiable }} nothing could check</span>
+    <span><i class="bad"></i>{{ p.not_found }} quoted text that is not there</span>
+    <span><i class="none"></i>{{ p.absent }} not stated</span>
+  </p>
+{% endif %}
 <table>
   <thead>
     <tr><th>Field</th><th>Value</th><th>Confidence</th><th>Evidence</th><th>Status</th></tr>
@@ -38,7 +56,7 @@
   <tbody>
   {% for f in view.fields %}
     <tr>
-      <td class="mono">{{ f.name }}</td>
+      <td>{{ f.label }}</td>
       <td>
         {% if f.value is none %}<span class="muted">not stated</span>
         {% else %}{{ f.value }}{% if f.currency %} {{ f.currency }}{% endif %}{% endif %}
