@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from contract_intake.adapters.imap import ImapMailbox
 from contract_intake.config import get_settings
 from contract_intake.db.engine import init_db, session_scope
-from contract_intake.db.models import Attachment, LLMCall
+from contract_intake.db.models import Attachment, DeadLetter, LLMCall
 from contract_intake.knowledge.policy import get_index, parse_playbook
 from contract_intake.knowledge.vendors import load_registry
 from contract_intake.llm.client import LLMClient
@@ -95,6 +95,60 @@ def _cmd_knowledge(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_dead(args: argparse.Namespace) -> int:
+    """List what the pipeline could not finish, and optionally replay it.
+
+    A dead letter is not an apology -- it carries the stage, the error class and
+    the attempt count, which is enough to decide whether the cause was transient
+    (replay) or structural (fix, then replay).
+    """
+    with session_scope() as session:
+        rows = session.execute(
+            select(DeadLetter, Attachment)
+            .join(Attachment, DeadLetter.attachment_id == Attachment.id)
+            .order_by(DeadLetter.id.desc())
+        ).all()
+
+        if args.replay is None:
+            for letter, attachment in rows:
+                print(
+                    f"#{letter.attachment_id:<4} {attachment.filename[:34]:<35} "
+                    f"{letter.stage:<9} {letter.error_class:<22} "
+                    f"x{letter.attempts}  {letter.message[:60]}"
+                )
+            if not rows:
+                print("nothing dead")
+            return 0
+
+        attachment = session.get(Attachment, args.replay)
+        if attachment is None:
+            print(f"no attachment {args.replay}", file=sys.stderr)
+            return 2
+
+        letter = session.scalars(
+            select(DeadLetter)
+            .where(DeadLetter.attachment_id == attachment.id)
+            .order_by(DeadLetter.id.desc())
+        ).first()
+        if letter is None:
+            print(f"attachment {attachment.id} has no dead letter", file=sys.stderr)
+            return 2
+
+        stage = next((s for s in STAGES if s.name == letter.stage), None)
+        if stage is None:
+            print(f"unknown stage {letter.stage!r}", file=sys.stderr)
+            return 2
+
+        # Rewind to the status that stage consumes, and clear the counters so the
+        # replay gets a full set of attempts rather than inheriting the old ones.
+        attachment.status = stage.consumes
+        attachment.attempts = 0
+        attachment.retry_after = None
+        session.flush()
+        print(f"attachment {attachment.id} rewound to {stage.consumes}; run `drain` to retry")
+    return 0
+
+
 def _cmd_costs(_args: argparse.Namespace) -> int:
     with session_scope() as session:
         rows = session.execute(
@@ -143,6 +197,10 @@ def main() -> int:
     p_kb.add_argument("--query", help="try a policy lookup")
     p_kb.set_defaults(func=_cmd_knowledge)
     sub.add_parser("drain", help="advance all pending work").set_defaults(func=_cmd_drain)
+
+    p_dead = sub.add_parser("dead", help="list or replay dead letters")
+    p_dead.add_argument("--replay", type=int, metavar="ATTACHMENT_ID")
+    p_dead.set_defaults(func=_cmd_dead)
     sub.add_parser("costs", help="print the cost ledger").set_defaults(func=_cmd_costs)
     sub.add_parser("stages", help="print the pipeline").set_defaults(func=_cmd_stages)
 

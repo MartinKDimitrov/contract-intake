@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Final
 
 from sqlalchemy import select
@@ -41,6 +42,17 @@ from contract_intake.status import Status, is_terminal
 log = logging.getLogger(__name__)
 
 MAX_ATTEMPTS: Final = 3
+
+#: Backoff between attempts, in seconds: 30s, then 2m, then the row is dead.
+#: Short enough that a transient blip clears on its own, long enough that a rate
+#: limit is not answered with another request immediately.
+BACKOFF_SECONDS: Final = (30, 120, 300)
+
+
+def _backoff_for(attempts: int) -> datetime:
+    index = min(max(attempts - 1, 0), len(BACKOFF_SECONDS) - 1)
+    return datetime.now(UTC) + timedelta(seconds=BACKOFF_SECONDS[index])
+
 
 #: The pipeline. Stage 01 (intake) is a Source and lives outside this chain --
 #: see base.py for why.
@@ -89,6 +101,7 @@ def pick_next(session: Session) -> Attachment | None:
         select(Attachment)
         .where(Attachment.status.in_(tuple(STAGE_BY_CONSUMES)))
         .where(Attachment.attempts < MAX_ATTEMPTS)
+        .where((Attachment.retry_after.is_(None)) | (Attachment.retry_after <= datetime.now(UTC)))
         .order_by(Attachment.updated_at)
         .limit(1)
     )
@@ -139,12 +152,14 @@ def _persist(
             attachment.status = stage.produces
             attachment.status_reason = outcome.note or None
             attachment.attempts = 0
+            attachment.retry_after = None
         case Rejected(reason=reason):
             attachment.status = Status.REJECTED
             attachment.status_reason = reason
         case Failed(error=error, retryable=retryable):
             attachment.attempts += 1
             exhausted = not retryable or attachment.attempts >= MAX_ATTEMPTS
+            attachment.retry_after = None if exhausted else _backoff_for(attachment.attempts)
             if exhausted:
                 attachment.status = Status.DEAD
                 attachment.status_reason = f"{type(error).__name__}: {error}"

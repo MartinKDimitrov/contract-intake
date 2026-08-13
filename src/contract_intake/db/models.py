@@ -73,6 +73,12 @@ class Attachment(Base):
     status: Mapped[Status] = mapped_column(String(16), default=Status.RECEIVED, index=True)
     status_reason: Mapped[str | None] = mapped_column(Text, default=None)
     attempts: Mapped[int] = mapped_column(Integer, default=0)
+    retry_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None, index=True
+    )
+    """Not runnable before this. Set on a retryable failure so a rate limit or a
+    flapping dependency is backed off rather than hammered on the next pass."""
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, onupdate=_now
