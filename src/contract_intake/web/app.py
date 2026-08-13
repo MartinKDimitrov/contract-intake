@@ -1,7 +1,8 @@
-"""HTTP surface: health, cost ledger, review queue, inbound webhook.
+"""HTTP surface: health, cost ledger, review queue.
 
 Kept thin on purpose -- it renders what the pipeline produced and never contains
-business logic. The review queue itself arrives in phase 5.
+business logic. There is no inbound webhook route: `WebhookSource` exists in stage 01 as the
+seam for one, and nothing is wired to HTTP.
 """
 
 from __future__ import annotations
@@ -109,11 +110,23 @@ def review_item(request: Request, item_id: int) -> Any:
 
 
 @app.post("/review/{item_id}/resolve")
-def resolve(item_id: int, action: str = Form(...)) -> RedirectResponse:
+async def resolve(item_id: int, request: Request, action: str = Form(...)) -> RedirectResponse:
+    """Close a review item, carrying whatever the reviewer changed.
+
+    The corrections are read from the form rather than declared as parameters:
+    which fields a reviewer may edit is a property of the extraction schema, and
+    duplicating that list here is how the two drift. Anything posted under
+    ``field:<name>`` and differing from the extracted value is a correction.
+    """
     if action not in {"approve", "reject"}:
         raise HTTPException(status_code=400, detail="action must be approve or reject")
+
+    form = await request.form()
     with session_scope() as session:
-        if review.resolve_item(session, item_id, action=action) is None:
+        corrections = review.corrections_from_form(
+            session, item_id, {k: v for k, v in form.items() if isinstance(v, str)}
+        )
+        if review.resolve_item(session, item_id, action=action, corrections=corrections) is None:
             raise HTTPException(status_code=404, detail="no such review item")
     return RedirectResponse(f"/review/{item_id}", status_code=303)
 

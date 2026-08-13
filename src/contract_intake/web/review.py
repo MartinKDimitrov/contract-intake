@@ -20,7 +20,6 @@ from sqlalchemy.orm import Session
 
 from contract_intake.db.models import (
     Attachment,
-    Contract,
     Decision,
     Document,
     Email,
@@ -30,6 +29,7 @@ from contract_intake.db.models import (
     ReviewItem,
 )
 from contract_intake.status import Route
+from contract_intake.store.contracts import record as store_contract
 
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -90,8 +90,28 @@ class ItemView:
         return Route(self.decision.route)
 
     @property
+    def agent_ran(self) -> bool:
+        """Stage 05 skips the agent whenever a deterministic check already fired.
+
+        That is the common path for a document in this queue, and it must not be
+        confused with an agent that ran and looked nothing up.
+        """
+        return bool(self.trace)
+
+    @property
     def consulted_knowledge_base(self) -> bool:
-        return any(t.get("tool") != "record_finding" for t in self.trace)
+        """Did the agent, having run, actually look anything up?
+
+        Meaningless when the agent did not run -- which is why `agent_ran` is
+        asked first. Read on its own it accused the model of relying on its own
+        priors precisely when the findings came from arithmetic in
+        `policy/thresholds.py`.
+        """
+        return self.agent_ran and any(t.get("tool") != "record_finding" for t in self.trace)
+
+    @property
+    def findings_from_rules(self) -> int:
+        return sum(1 for f in self.findings if f.get("source") == "rules")
 
 
 def queue(session: Session, *, state: str = "open", limit: int = 100) -> list[QueueRow]:
@@ -194,6 +214,35 @@ def build_fields(extraction: dict[str, Any]) -> list[FieldView]:
     return out
 
 
+#: Prefix a form field carries when it is an editable extracted value.
+FIELD_PREFIX = "field:"
+
+
+def corrections_from_form(session: Session, item_id: int, form: dict[str, str]) -> dict[str, Any]:
+    """Whatever the reviewer changed, and nothing they did not.
+
+    Only fields that differ from the extracted value count. Recording an
+    unchanged value as a correction would make every approval look like a
+    disagreement, and the whole point of keeping the two side by side is that
+    the disagreements are visible.
+    """
+    view = load_item(session, item_id)
+    if view is None:
+        return {}
+
+    extracted = {f.name: f.value for f in view.fields}
+    corrections: dict[str, Any] = {}
+    for key, raw in form.items():
+        if not key.startswith(FIELD_PREFIX):
+            continue
+        name = key[len(FIELD_PREFIX) :]
+        if name not in extracted:
+            continue
+        if str(raw).strip() != str(extracted[name] if extracted[name] is not None else "").strip():
+            corrections[name] = raw.strip()
+    return corrections
+
+
 def resolve_item(
     session: Session,
     item_id: int,
@@ -224,9 +273,11 @@ def resolve_item(
 
 
 def _promote(session: Session, item: ReviewItem) -> None:
-    if session.scalar(select(Contract).where(Contract.decision_id == item.decision_id)):
-        return
+    """File the contract a reviewer approved. Idempotent, like stage 07's path.
 
+    Both write through store/contracts.py. They used to write it separately, in
+    their own words, and had already drifted.
+    """
     row = session.execute(
         select(Enrichment, Extraction)
         .join(Decision, Decision.enrichment_id == Enrichment.id)
@@ -237,21 +288,12 @@ def _promote(session: Session, item: ReviewItem) -> None:
         return
 
     enrichment, extraction = row
-    payload = {
-        name: (entry.get("value") if isinstance(entry, dict) else entry)
-        for name, entry in extraction.fields.items()
-        if not name.startswith("_")
-    }
-    payload |= item.human_corrections
-    payload["_approved_by_human"] = True
-
-    session.add(
-        Contract(
-            decision_id=item.decision_id,
-            counterparty_id=enrichment.counterparty_id,
-            counterparty_name=str(payload.get("counterparty_name") or ""),
-            payload=payload,
-        )
+    store_contract(
+        session,
+        decision_id=item.decision_id,
+        fields=extraction.fields,
+        counterparty_id=enrichment.counterparty_id,
+        corrections=item.human_corrections,
     )
 
 
@@ -261,9 +303,12 @@ def _reason_weight(reason: dict[str, Any]) -> tuple[int, str]:
         "suspended_counterparty": 1,
         "high_severity_finding": 2,
         "unsupported_quote": 3,
-        "unresolved_counterparty": 4,
-        "medium_severity_finding": 5,
-        "wholly_unverifiable": 6,
-        "low_confidence_required_field": 7,
+        "partially_unverifiable": 4,
+        "unresolved_counterparty": 5,
+        "medium_severity_finding": 6,
+        "wholly_unverifiable": 7,
+        "missing_required_field": 8,
+        "low_confidence_required_field": 9,
+        "low_severity_finding": 10,
     }
     return rank.get(str(reason.get("rule")), 9), str(reason.get("message", ""))
