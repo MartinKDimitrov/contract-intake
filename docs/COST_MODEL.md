@@ -4,7 +4,7 @@ Every figure here is read from the `llm_calls` ledger, which every model call
 writes to on success, refusal and exception alike. Nothing is estimated.
 
 Measured on `claude-opus-5`, first-party API list pricing ($5 / $25 per MTok),
-against the four generated fixtures.
+against the four authored documents.
 
 ---
 

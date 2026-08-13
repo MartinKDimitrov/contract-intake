@@ -8,16 +8,16 @@ what is stubbed, what will break first, and what to build next.
 ## Running it
 
 ```bash
-make setup            # venv, dependencies, embedding model, fixtures
+make setup            # venv, dependencies, embedding model, rendered corpus
 cp .env.example .env  # then fill in the values below
-make test             # 238 tests, hermetic -- no API key, no network
-make triage           # classify 93 documents, free
+make test             # 243 tests, hermetic -- no API key, no network
+make triage           # classify 135 documents, free
 make run              # review queue on :8000
 make poll             # fetch mail and run the pipeline
 ```
 
 Python 3.12. `make setup` also downloads Chroma's ONNX embedding model (~80MB,
-once) and generates the fixture PDFs.
+once) and renders the corpus to PDF.
 
 ### Configuration
 
@@ -59,7 +59,7 @@ live mailbox and a live API.
 | `knowledge/data/vendors.json` | 20 invented suppliers. No real company appears. |
 | `knowledge/data/playbook.md` | An invented contracting policy. |
 | `knowledge/data/playbook_checks.json` | The machine-checkable half of the same. |
-| `evals/fixtures/source/*.txt` | Generated contracts and lookalikes. |
+| `evals/documents/authored/`, `generated/` | Invented contracts and lookalikes. `collected/` is real. |
 
 The vendor registry is a JSON file because that is the smallest thing that
 demonstrates entity resolution. In practice it is a view over a supplier master
@@ -77,19 +77,20 @@ stays prose.
 
 | claim | measured on |
 |---|---|
-| Triage: 93/93 correct, zero tokens | 33 fixtures + 60 real TED notices in bg/de/en, 1,034 pages |
-| Extraction: 29/29 fields | 3 generated contracts, including a degraded scan |
+| Triage: 135/135 correct, zero tokens | 35 authored and generated + 100 real TED notices in bg/de/en/es/fr, 1,719 pages |
+| Extraction: 29/29 fields | 3 authored contracts, including a degraded scan |
 | Knowledge base: 4/4 deviations found, 0/4 without it | 1 contract with four known deviations |
 | Cost: $0.061–0.105 per document | the ledger, across the runs above |
 
-The triage number is the strong one: sixty of those documents were written by
-European contracting authorities with no knowledge of this system.
+The triage number is the strong one: a hundred of those documents were written
+by European contracting authorities with no knowledge of this system.
 
 **The extraction and knowledge-base numbers are not.** They rest on three
 documents that I wrote, with expected values that I also wrote. 100% on 29
-fields is encouraging and is not evidence. Extending `evals/expected/` over the
-ten real contracts already in `evals/fixtures/` is the first thing to do, and
-costs about $0.70.
+fields is encouraging and is not evidence — which is precisely why
+`evals/documents/` is filed by provenance: the folder a number came from is part
+of the number. Extending `evals/expected/` over the thirty generated contracts
+is the first thing to do, and costs about $0.70.
 
 ---
 
@@ -107,10 +108,14 @@ the first deployment that holds real contracts.
 **A contract longer than 120 pages** is rejected by triage as a probable bundle
 (`loaders/pdf.MAX_REASONABLE_PAGES`). That threshold is a guess.
 
-**A document in a fourth language.** The triage vocabulary covers English,
-Bulgarian and German. A French or Romanian contract will be turned away with
-"0 instrument markers" and never reach a model. Extending it is a data change in
-`stage_02_triage.py`, and the corpus check is how you would know it worked.
+**A document in a sixth language.** The triage vocabulary covers English,
+Bulgarian, German, Spanish and French. A Romanian or Polish contract will be
+turned away with "0 instrument markers" and never reach a model. Extending it is
+a data change in `stage_02_triage.py` -- but add a contract in the new language
+to `evals/documents/authored/` at the same time. The TED corpus is entirely
+negative, so it will score a perfect 20/20 on a language the vocabulary knows
+nothing about, which is exactly what Spanish and French did before the positive
+cases were added.
 
 **Prompt cache economics on a sparse queue.** Cache writes are 22–30% of a call.
 Processing one document in isolation writes a cache nobody reads. The published
@@ -146,10 +151,12 @@ saw. Start with the provenance status of the field that was wrong.
 
 ## Next, in order
 
-**1. Ground truth on the real contracts.** `evals/fixtures/` already holds ten
-real contracts — addenda, bilingual leases, an NDA, an SLA — that have passed
-triage but never been extracted. Writing `evals/expected/*.json` for them turns
-the extraction number from three documents to thirteen. About $0.70 and an hour.
+**1. Ground truth beyond the documents I wrote.** `evals/documents/generated/`
+holds thirty contracts and lookalikes from three different models — addenda,
+bilingual leases, an NDA, an SLA — that have passed triage but never been
+extracted. Writing `evals/expected/*.json` for the contracts among them widens
+the extraction number past documents whose answers I also authored. About $0.70
+and an hour.
 
 **2. Batch processing.** The Batches API is 50% cheaper for up to 24 hours of
 latency, which contract intake by email can absorb comfortably. It needs an
@@ -173,8 +180,9 @@ was 6.7x cheaper and missed one finding while adding a false positive
 ([COST_MODEL.md](COST_MODEL.md)). The per-stage model setting already exists;
 the decision needs more than three documents.
 
-**5. A fourth language.** French or Romanian, following the pattern in
-`stage_02_triage.py` and verified with `make corpus && make triage`.
+**5. A sixth language.** Romanian or Polish, following the pattern in
+`stage_02_triage.py`, with a positive case per the warning above, and verified
+with `make corpus && make triage`.
 
 ---
 

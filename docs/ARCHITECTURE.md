@@ -162,18 +162,21 @@ which is what makes the published numbers measured rather than estimated.
 Deterministic checks run before the agent, so a document that already fails one
 costs nothing to enrich. Full breakdown: [COST_MODEL.md](COST_MODEL.md).
 
-## Two corpora
+## What it is tested against
 
-The free stages run over both on every check, because they cost nothing to run
-and everything to get wrong.
+The free stages run over every document on every check, because they cost
+nothing to run and everything to get wrong.
 
-| | what it is | what it proves |
-|---|---|---|
-| `evals/fixtures/` | 33 generated documents: 10 contracts, 23 lookalikes | both directions — contracts pass, certificates and invoices do not |
-| `evals/corpus/` | 60 real TED procurement notices, bg/de/en | that a vocabulary claiming three languages works on documents nobody wrote for it |
+`evals/documents/` is filed by provenance — `authored/`, `generated/` (split by
+the model that wrote each one), `collected/` — because where a document came
+from decides what a result on it is worth. A hundred real TED procurement
+notices in five languages are evidence; six documents I wrote myself are a
+demonstration that the intended path runs. `make triage` reports them
+separately rather than averaging them into one number.
 
-The corpus is fetched by `evals/corpus.py` rather than committed; the script is
-the source. Both are reported by `make triage`, which spends nothing.
+The collected corpus is entirely negative, so it is paired with contracts in
+each of the five languages that must pass. Detail and the defect that pairing
+caught: [evals/documents/README.md](../evals/documents/README.md).
 
 ## Running it
 
@@ -184,7 +187,7 @@ make lint      # ruff + mypy strict
 make run       # review UI, /healthz, /metrics/costs
 make poll      # IMAP poller + pipeline worker
 make stage N=04 ID=17
-make triage    # classify both corpora, free
+make triage    # classify every document, by provenance, free
 make eval      # field accuracy and knowledge-base contribution (costs money)
 make dead      # what could not be finished, and why
 ```
