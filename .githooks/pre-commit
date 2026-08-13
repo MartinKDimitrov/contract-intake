@@ -54,6 +54,8 @@ pre-commit: source changed and nothing was documented.
 
   If this change genuinely documents itself, say so:  git commit --no-verify
 
+  The conventions this hook enforces are listed in docs/HAND_OVER.md.
+
 MSG
         exit 1
     fi

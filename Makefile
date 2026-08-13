@@ -35,7 +35,7 @@ lint:  ## ruff + mypy
 	$(PY) -m mypy
 
 .PHONY: check
-check: lint docs coverage audit triage verify  ## Everything a commit must pass. Runs in CI too.
+check: lint docs fields coverage audit triage verify  ## Everything a commit must pass. Runs in CI too.
 	@echo
 	@echo "check: passed -- lint, tests with a coverage floor, the external"
 	@echo "       audit, and classification of every document."
@@ -71,6 +71,10 @@ coverage:  ## Tests with a floor that fails the build
 .PHONY: docs
 docs:  ## Align the tables in the documentation so they read without a renderer
 	@$(PY) scripts/align_tables.py --check || ($(PY) scripts/align_tables.py && exit 1)
+
+.PHONY: fields
+fields:  ## Align field declarations into columns, and keep the formatter off them
+	@$(PY) scripts/align_fields.py --check || ($(PY) scripts/align_fields.py && exit 1)
 
 .PHONY: verify
 verify:  ## Quote verification over the real corpus (free)

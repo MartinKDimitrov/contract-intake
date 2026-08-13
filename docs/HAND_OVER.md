@@ -47,6 +47,30 @@ label*, then point `CI_IMAP_FOLDER` at that label.
 
 ---
 
+## Conventions, and what enforces them
+
+Three things about this codebase are not left to taste, because each one decayed
+when it was. All three are checked by `make check`, which `.githooks/pre-commit`
+runs before every commit -- so you find out while you are writing, not in review.
+
+**Changing behaviour means documenting it.** A commit that touches
+`src/contract_intake/` must also change prose: a docstring or comment in the same
+diff, or a file under `docs/`. Five audits of this repository each found claims
+the code had quietly stopped honouring, every one true when written.
+
+**Field declarations read as a table.** Names, types and defaults line up in
+columns, inside `# fmt: off` / `# fmt: on` so the formatter leaves them alone.
+Write them however you like and run `make fields`; it aligns them for you, and
+skips any block that would push a line past 100 characters. Everything else in
+the file stays automatically formatted by `ruff format`.
+
+**Markdown tables line up in the source.** `make docs` pads them. Most of the
+reasoning here lives in tables, and most of the places it gets read -- a
+terminal, a diff, `git show` -- have no renderer.
+
+The escape hatch for all three is `git commit --no-verify`, which is deliberately
+something you have to type.
+
 ## What is real and what is not
 
 **Real:** the pipeline, the state machine, retries and dead letters, extraction
