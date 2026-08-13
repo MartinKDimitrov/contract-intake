@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}costs{% endblock %}
+{% block body %}
+
+<h1>Cost ledger</h1>
+<p class="sub">
+  ${{ '%.4f'|format(costs.total_usd) }} over {{ costs.documents_delivered }} delivered
+  document{{ '' if costs.documents_delivered == 1 else 's' }}
+  &middot; ${{ '%.4f'|format(costs.usd_per_document) }} each
+</p>
+
+<h2>By stage</h2>
+<table>
+  <thead>
+    <tr><th>Purpose</th><th>Calls</th><th>USD</th><th>In</th><th>Out</th><th>Cache read</th></tr>
+  </thead>
+  <tbody>
+  {% for row in costs.by_stage %}
+    <tr>
+      <td class="mono">{{ row.purpose }}</td>
+      <td>{{ row.calls }}</td>
+      <td class="mono">${{ '%.4f'|format(row.usd) }}</td>
+      <td class="mono muted">{{ row.input_tokens }}</td>
+      <td class="mono muted">{{ row.output_tokens }}</td>
+      <td class="mono muted">{{ row.cache_read_tokens }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">Nothing spent yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<p class="muted" style="margin-top:16px">
+  Every call is written here on success, refusal and exception alike, so these
+  figures are measured rather than estimated. The same data as JSON:
+  <a href="/metrics/costs" class="mono">/metrics/costs</a>.
+</p>
+
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}contracts{% endblock %}
+{% block body %}
+
+<h1>Contracts</h1>
+<p class="sub">
+  {{ contracts|length }} filed. Machine-approved unless marked otherwise.
+</p>
+
+{% for c in contracts %}
+  <div class="card" style="margin-bottom:14px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <b>{{ c.counterparty }}</b>
+      <span>
+        <span class="mono muted">{{ c.counterparty_id }}</span>
+        {% if c.by_human %}<span class="tag medium">approved by a person</span>{% endif %}
+      </span>
+    </div>
+    <table style="margin-top:10px">
+      <tbody>
+      {% for name, value in c.terms.items() %}
+        {% if value is not none %}
+          <tr>
+            <td class="mono muted" style="width:34%">{{ name }}</td>
+            <td>{{ value }}</td>
+          </tr>
+        {% endif %}
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="muted">Nothing has been filed yet.</p>
+{% endfor %}
+
+{% endblock %}

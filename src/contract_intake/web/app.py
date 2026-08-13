@@ -131,7 +131,31 @@ async def resolve(item_id: int, request: Request, action: str = Form(...)) -> Re
     return RedirectResponse(f"/review/{item_id}", status_code=303)
 
 
-@app.get("/contracts")
+@app.get("/contracts", response_class=HTMLResponse)
+def contracts_page(request: Request) -> Any:
+    """Everything that made it through, for a person."""
+    with session_scope() as session:
+        rows = session.scalars(select(Contract).order_by(Contract.id.desc())).all()
+        filed = [
+            {
+                "id": c.id,
+                "counterparty": c.counterparty_name or "unnamed",
+                "counterparty_id": c.counterparty_id or "unresolved",
+                "by_human": bool(c.payload.get("_approved_by_human")),
+                "terms": {k: v for k, v in c.payload.items() if not k.startswith("_")},
+            }
+            for c in rows
+        ]
+    return templates.TemplateResponse(request, "contracts.html", {"contracts": filed})
+
+
+@app.get("/costs", response_class=HTMLResponse)
+def costs_page(request: Request) -> Any:
+    """The same figures as /metrics/costs, for a person rather than a scraper."""
+    return templates.TemplateResponse(request, "costs.html", {"costs": costs()})
+
+
+@app.get("/metrics/contracts")
 def contracts() -> list[dict[str, Any]]:
     """Everything that made it through, machine-approved or human-approved."""
     with session_scope() as session:

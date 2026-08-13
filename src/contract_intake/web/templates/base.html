@@ -5,60 +5,124 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}contract intake{% endblock %}</title>
   <style>
+    /* Palette and type scale from a design pass in Lovable, ported by hand:
+       the app is server-rendered Jinja reading the live database, so the design
+       travels as CSS rather than as a second application. */
     :root {
-      --bg: #fbfbfa; --fg: #1c1c1a; --muted: #6b6b64; --line: #e3e2dd;
-      --card: #fff; --high: #b3261e; --med: #8a5a00; --low: #5a6b55; --ok: #2c6e49;
+      --bg:            #0b0d10;
+      --surface:       #111419;
+      --surface-raised:#161a20;
+      --hover:         #141820;
+      --border:        #1e232b;
+      --border-strong: #2a3039;
+      --text:          #a0aab7;
+      --text-strong:   #d7dde6;
+      --muted:         #6b7786;
+      --accent:        #5f9e9e;
+      --accent-dim:    #4a7f7f;
+      --ok:            #4a7c54;  --ok-bg:     #14251a;  --ok-border:     #2a4a33;
+      --warn:          #8c6d3f;  --warn-bg:   #1f1a12;  --warn-border:   #4a3a24;
+      --bad:           #8b4a4a;  --bad-bg:    #211414;  --bad-border:    #4a2a2a;
+      --radius: 4px;
+      --ui:    "Inter", "SF Pro Text", system-ui, -apple-system, sans-serif;
+      --prose: Georgia, "Times New Roman", serif;
+      --mono:  ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
     }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #16161a; --fg: #e8e8e4; --muted: #9a9a92; --line: #2c2c32;
-        --card: #1d1d22; --high: #ef8a80; --med: #d9a441; --low: #9dbb92; --ok: #6fcf97;
-      }
-    }
+
     * { box-sizing: border-box; }
     body {
-      margin: 0; background: var(--bg); color: var(--fg);
-      font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+      background: var(--bg); color: var(--text); font-family: var(--ui);
+      font-size: 14px; line-height: 1.5; margin: 0; padding: 40px 24px 72px;
+      -webkit-font-smoothing: antialiased;
     }
-    header {
-      border-bottom: 1px solid var(--line); padding: 14px 24px;
-      display: flex; gap: 20px; align-items: baseline;
+    main, nav { max-width: 1100px; margin: 0 auto; }
+
+    nav { padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+    nav a {
+      color: var(--muted); text-decoration: none; margin-right: 20px;
+      font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
     }
-    header b { font-weight: 600; letter-spacing: -.01em; }
-    header a { color: var(--muted); text-decoration: none; }
-    header a:hover { color: var(--fg); }
-    main { max-width: 1080px; margin: 0 auto; padding: 24px; }
-    h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
-    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .07em;
-         color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
-    .sub { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { text-align: left; font-size: 12px; text-transform: uppercase;
-         letter-spacing: .05em; color: var(--muted); padding: 6px 10px;
-         border-bottom: 1px solid var(--line); font-weight: 600; }
-    td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-    tr:hover td { background: var(--card); }
-    a.row { color: inherit; text-decoration: none; font-weight: 500; }
-    a.row:hover { text-decoration: underline; }
-    .card { background: var(--card); border: 1px solid var(--line);
-            border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
-    .tag { display: inline-block; font-size: 11px; padding: 1px 7px;
-           border-radius: 20px; border: 1px solid currentColor; font-weight: 600;
-           text-transform: uppercase; letter-spacing: .04em; }
-    .high { color: var(--high); } .medium { color: var(--med); }
-    .low { color: var(--low); } .ok { color: var(--ok); }
-    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-    .quote { color: var(--muted); font-size: 13px; margin-top: 3px;
-             border-left: 2px solid var(--line); padding-left: 9px; }
-    .cite { font-weight: 600; margin-right: 6px; }
+    nav a:hover { color: var(--text-strong); }
+
+    h1 {
+      font-family: var(--mono); font-size: 22px; font-weight: 500; letter-spacing: -.01em;
+      color: var(--text-strong); margin: 0 0 12px;
+    }
+    h2 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .12em;
+      color: var(--muted); margin: 48px 0 18px;
+    }
+    p.sub { margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+    a { color: var(--accent); }
+
+    .mono  { font-family: var(--mono); font-variant-numeric: tabular-nums; }
     .muted { color: var(--muted); }
-    button { font: inherit; padding: 7px 15px; border-radius: 6px;
-             border: 1px solid var(--line); background: var(--card);
-             color: var(--fg); cursor: pointer; }
-    button.primary { border-color: var(--ok); color: var(--ok); font-weight: 600; }
-    button:hover { border-color: var(--fg); }
-    details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
-    .empty { color: var(--muted); padding: 40px 0; text-align: center; }
+    .quote { font-family: var(--mono); font-size: 12px; font-style: italic; color: var(--text); }
+    .cite  {
+      font-family: var(--mono); font-size: 12px; color: var(--muted);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 1px 6px;
+      margin-right: 10px;
+    }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px; margin-bottom: 14px;
+      font-family: var(--prose); font-size: 15px; line-height: 1.6; color: var(--text-strong);
+    }
+    .card.high   { border-left: 3px solid var(--bad);  background: var(--bad-bg); }
+    .card.medium { border-left: 3px solid var(--warn); background: var(--warn-bg); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); overflow: hidden; }
+    th, td { padding: 10px 14px; text-align: left; vertical-align: top;
+             border-bottom: 1px solid var(--border); }
+    th { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+         color: var(--muted); background: var(--surface-raised); }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--hover); }
+    td:first-child { color: var(--text-strong); font-weight: 500; }
+    a.row { color: var(--text-strong); text-decoration: none; }
+    a.row:hover { color: var(--accent); }
+
+    .tag {
+      display: inline-flex; align-items: center; padding: 2px 8px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: var(--mono); font-size: 11px; line-height: 1.4;
+      color: var(--text); background: var(--surface);
+    }
+    .tag.ok     { background: var(--ok-bg);   color: var(--ok);   border-color: var(--ok-border); }
+    .tag.medium { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+    .tag.high   { background: var(--bad-bg);  color: var(--bad);  border-color: var(--bad-border); }
+
+    details { border: 1px solid var(--border); border-radius: var(--radius);
+              background: var(--surface); margin-bottom: 14px; }
+    summary { padding: 13px 16px; cursor: pointer; font-size: 13px;
+              color: var(--text); user-select: none; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: "\25B8"; display: inline-block; margin-right: 8px;
+                      color: var(--muted); transition: transform .15s ease; }
+    details[open] summary::before { transform: rotate(90deg); }
+    details > *:not(summary) { padding: 0 16px 16px; }
+
+    input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 8px 10px; color: var(--text-strong); font-family: var(--mono);
+      font-size: 13px; outline: none; transition: border-color .15s ease;
+    }
+    input:focus { border-color: var(--accent); }
+
+    button {
+      padding: 10px 20px; border-radius: var(--radius); font-size: 13px; font-weight: 500;
+      font-family: var(--ui); cursor: pointer; border: 1px solid var(--border);
+      background: transparent; color: var(--text); margin-right: 10px;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    button:hover { background: var(--surface-raised); border-color: var(--border-strong); }
+    button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    button.primary:hover { background: var(--accent-dim); border-color: var(--accent-dim); }
+
+    .empty { color: var(--muted); font-style: italic; }
   </style>
 </head>
 <body>
@@ -66,7 +130,7 @@
     <b>contract intake</b>
     <a href="/">queue</a>
     <a href="/contracts">approved</a>
-    <a href="/metrics/costs">costs</a>
+    <a href="/costs">costs</a>
   </header>
   <main>{% block body %}{% endblock %}</main>
 </body>

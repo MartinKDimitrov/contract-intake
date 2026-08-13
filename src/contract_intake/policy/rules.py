@@ -190,6 +190,12 @@ def rule_suspended_counterparty(ev: Evidence, _s: Settings) -> list[Reason]:
     """
     if ev.counterparty_status == "approved":
         return []
+    if not ev.counterparty_id:
+        # Nothing resolved, so there is no supplier to call unapproved.
+        # `rule_unresolved_counterparty` owns that case; firing here as well
+        # gave a reviewer two reasons for one fact, the second reading
+        # "None is 'unknown' in the registry, not approved".
+        return []
     return [
         Reason(
             rule="suspended_counterparty",
