@@ -1,0 +1,114 @@
+{
+  "_comment": "Machine-checkable half of the playbook. Every entry cites a section of playbook.md, which stays the human-maintained source of truth and the text the agent retrieves. A test asserts every section named here exists there. Anything expressible as a comparison belongs here; anything requiring judgement stays prose.",
+  "checks": [
+    {
+      "id": "payment_terms_range",
+      "section": "§1.1",
+      "field": "payment_terms_days",
+      "op": "between",
+      "min": 45,
+      "max": 90,
+      "severity": "medium",
+      "message": "payment terms of {value} days fall outside the accepted {min}-{max} day range"
+    },
+    {
+      "id": "initial_term_range",
+      "section": "§2.1",
+      "field": "term_months",
+      "op": "between",
+      "min": 12,
+      "max": 36,
+      "severity": "medium",
+      "message": "initial term of {value} months is outside the standard {min}-{max} months"
+    },
+    {
+      "id": "no_auto_renewal",
+      "section": "§2.2",
+      "field": "auto_renewal",
+      "op": "equals",
+      "expected": false,
+      "severity": "medium",
+      "message": "the agreement renews automatically; renewal must require a written act by both parties"
+    },
+    {
+      "id": "termination_notice_ceiling",
+      "section": "§2.3",
+      "field": "termination_notice_days",
+      "op": "lte",
+      "limit": 90,
+      "severity": "medium",
+      "message": "termination notice of {value} days exceeds the {limit}-day ceiling"
+    },
+    {
+      "id": "liability_cap_floor",
+      "section": "§3.1",
+      "field": "liability_cap",
+      "op": "gte",
+      "limit": 250000,
+      "severity": "high",
+      "message": "liability cap of {value} is below the {limit} minimum"
+    },
+    {
+      "id": "liability_cap_present",
+      "section": "§3.2",
+      "field": "liability_cap",
+      "op": "required",
+      "severity": "high",
+      "message": "no liability cap is stated; an unlimited or excluded liability is not accepted"
+    },
+    {
+      "id": "approved_jurisdiction",
+      "section": "§4.1",
+      "field": "governing_law",
+      "op": "matches_any",
+      "allowed": [
+        "bulgaria",
+        "germany",
+        "austria",
+        "netherlands",
+        "england",
+        "wales"
+      ],
+      "severity": "high",
+      "message": "governing law {value!r} is outside the approved jurisdictions"
+    },
+    {
+      "id": "offshore_jurisdiction",
+      "section": "§4.1",
+      "field": "governing_law",
+      "op": "matches_none",
+      "forbidden": [
+        "cayman",
+        "british virgin",
+        "panama",
+        "seychelles",
+        "bermuda"
+      ],
+      "severity": "high",
+      "message": "governing law {value!r} is an offshore jurisdiction of elevated severity"
+    },
+    {
+      "id": "dpa_required_for_processors",
+      "section": "§5.1",
+      "field": "dpa_present",
+      "op": "equals",
+      "expected": true,
+      "applies_to_categories": [
+        "data_analytics",
+        "it_services",
+        "professional_services"
+      ],
+      "severity": "high",
+      "message": "no data processing agreement, and this supplier's category is presumed to process personal data",
+      "absent_fails": true
+    },
+    {
+      "id": "effective_date_present",
+      "section": "§2.1",
+      "field": "effective_date",
+      "op": "required",
+      "severity": "medium",
+      "message": "no effective date is stated, so no term can be computed"
+    }
+  ]
+}

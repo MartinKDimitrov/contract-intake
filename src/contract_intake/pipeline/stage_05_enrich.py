@@ -1,50 +1,54 @@
 """Stage 05 -- Enrich.
 
-WHAT     Resolve the counterparty against the vendor registry and check the
-         extracted terms against the internal contracting playbook.
+WHAT     Resolve the counterparty, check the extracted terms against the
+         playbook, and call the agent only for what a check cannot express.
 IN       Status.EXTRACTED
 OUT      Status.ENRICHED
-TOKENS   LLM agent loop, effort=medium, bounded by max_iterations and the
-         per-document USD ceiling. The only stage whose token use is not fixed
-         before it starts.
-FAILS    agent loops without converging, tool returns nothing, KB index missing,
-         model refusal, budget exhausted mid-loop.
-DEPENDS  agent/tools.py, agent/runner.py, knowledge/vendors.py, knowledge/policy.py
+TOKENS   0 for a document that already fails a deterministic check. Otherwise a
+         bounded agent loop, capped by max_iterations and the per-document USD
+         ceiling.
+FAILS    agent loops without converging, KB index missing, model refusal,
+         budget exhausted mid-loop.
+DEPENDS  policy/thresholds.py, knowledge/vendors.py, agent/
 
-This is where the knowledge base has to earn its place, and it does two jobs that
-need two different retrieval methods:
+The stage runs in three passes, cheapest first.
 
-  1. *Entity resolution.* "NordWind Logistics Ltd." on a crooked scan against a
-     registry holding "Nordwind Logistik GmbH". Names fail lexically, so this is
-     trigram matching -- a dense retriever would rank "Nordwind Marine Services
-     AS" alongside, because both are Nordic shipping firms.
-  2. *Policy validation.* "payment terms: 90 days" against a playbook whose
-     ceiling is 45. This is genuinely semantic, so it is dense retrieval, and a
-     hit carries its section number so the finding can cite it.
+**Counterparty resolution** is a pure function over a closed registry. It was a
+model tool once; it never needed to be.
 
-The second is the job the model cannot do alone: no amount of reasoning tells it
-what *this company's* liability ceiling is. That is the honest test of whether
-retrieval improves the result or decorates it, and evals/ answers it by running
-this stage with and without knowledge-base access.
+**Threshold checks** are comparisons. "Is 90 within 45 to 90?" is arithmetic,
+and an earlier version had a frontier model retrieve the clause, read the
+numbers out of prose and do that arithmetic -- non-deterministically, at roughly
+seven cents a document, in a system whose stated principle is that the model
+proposes and the code decides. That principle was only half true until these
+checks existed.
 
-The agent proposes findings; it does not decide. Routing is stage 06.
+**The agent** runs last, and only when the first two passes found nothing. If a
+document already fails three checks it is going to a human whatever the model
+says, so paying for an opinion is paying for nothing. Spending is reserved for
+the documents where the answer is not already known -- which is also where the
+agent's actual strength lies: judgement a comparison cannot carry, such as a
+90-day non-renewal window not being a termination-for-convenience right, or a
+contract being silent about something the registry implies it should cover.
 
-The full tool trace is persisted and rendered in the review UI, so a human can
-see which clause drove which finding -- or that no clause was consulted at all.
+Findings from both halves share one shape and both carry a citation, so stage 06
+does not care which produced them.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from sqlalchemy import select
 
 from contract_intake.agent.runner import review
 from contract_intake.db.models import Attachment, Enrichment, Extraction
 from contract_intake.db.models import Document as DocumentRow
+from contract_intake.knowledge.vendors import Match, resolve
 from contract_intake.llm.client import BudgetExceededError, RefusalError
 from contract_intake.pipeline.base import Advanced, Failed, Rejected, StageContext, StageOutcome
+from contract_intake.policy.thresholds import evaluate
 from contract_intake.status import Status
 
 log = logging.getLogger(__name__)
@@ -58,9 +62,6 @@ class EnrichStage:
     uses_llm: ClassVar[bool] = True
 
     async def run(self, ctx: StageContext) -> StageOutcome:
-        if ctx.llm is None:
-            return Failed(error=RuntimeError("stage 05 needs an LLM client"), retryable=False)
-
         attachment = ctx.session.get(Attachment, ctx.attachment_id)
         if attachment is None:
             return Rejected(reason=f"attachment {ctx.attachment_id} disappeared")
@@ -73,55 +74,83 @@ class EnrichStage:
         )
         if extraction is None:
             return Failed(
-                error=RuntimeError("no extraction; stage 04 must run first"),
-                retryable=False,
+                error=RuntimeError("no extraction; stage 04 must run first"), retryable=False
             )
 
-        try:
-            outcome = await review(
-                extraction.fields,
-                llm=ctx.llm,
-                settings=ctx.settings,
-                attachment_id=attachment.id,
-            )
-        except RefusalError as exc:
-            return Rejected(reason=f"model declined to review this contract: {exc}")
-        except BudgetExceededError as exc:
-            return Failed(error=exc, retryable=False, note="per-document budget spent")
-        except Exception as exc:
-            return Failed(error=exc, retryable=True)
+        fields = extraction.fields
 
-        if not outcome.used_knowledge_base:
-            # Not fatal, but it means the findings rest on the model's priors
-            # rather than on this company's policy -- exactly what stage 06 must
-            # not treat as authoritative.
-            log.warning(
-                "attachment %d: agent recorded %d finding(s) without consulting the knowledge base",
+        # Pass 1 -- resolution. Pure function, no tokens.
+        match = _resolve_counterparty(fields, ctx.settings.min_vendor_match)
+        category = match.vendor.category if match.vendor else None
+
+        # Pass 2 -- comparisons. Pure functions, no tokens.
+        findings: list[dict[str, Any]] = evaluate(fields, vendor_category=category)
+        trace: list[dict[str, Any]] = []
+        usd = 0.0
+        consulted_agent = False
+
+        # Pass 3 -- judgement, only where the answer is not already settled.
+        if findings:
+            log.info(
+                "attachment %d: %d deterministic deviation(s); the agent adds nothing to a "
+                "document already bound for review",
                 attachment.id,
-                len(outcome.findings),
+                len(findings),
             )
+        else:
+            if ctx.llm is None:
+                return Failed(error=RuntimeError("stage 05 needs an LLM client"), retryable=False)
+            try:
+                outcome = await review(
+                    fields, llm=ctx.llm, settings=ctx.settings, attachment_id=attachment.id
+                )
+            except RefusalError as exc:
+                return Rejected(reason=f"model declined to review this contract: {exc}")
+            except BudgetExceededError as exc:
+                return Failed(error=exc, retryable=False, note="per-document budget spent")
+            except Exception as exc:
+                return Failed(error=exc, retryable=True)
+
+            consulted_agent = True
+            findings.extend(f.to_json() | {"source": "agent"} for f in outcome.findings)
+            trace = outcome.trace
+            usd = outcome.usd
 
         ctx.session.add(
             Enrichment(
                 extraction_id=extraction.id,
-                findings=[f.to_json() for f in outcome.findings],
-                tool_trace=outcome.trace,
-                counterparty_id=outcome.counterparty_id,
-                counterparty_score=outcome.counterparty_score,
+                findings=findings,
+                tool_trace=trace,
+                counterparty_id=match.vendor.id if match.vendor else None,
+                counterparty_score=match.score,
             )
         )
         ctx.session.flush()
 
-        by_kind = {f.kind for f in outcome.findings}
+        from_rules = sum(1 for f in findings if f.get("source") == "rules")
         return Advanced(
             note=(
-                f"{len(outcome.findings)} finding(s) {sorted(by_kind)}, "
-                f"{len(outcome.trace)} tool call(s), ${outcome.usd:.4f}"
+                f"{len(findings)} finding(s): {from_rules} from checks, "
+                f"{len(findings) - from_rules} from the agent"
+                f"{'' if consulted_agent else ' (agent not needed)'}, ${usd:.4f}"
             ),
             metrics={
-                "findings": float(len(outcome.findings)),
-                "tool_calls": float(len(outcome.trace)),
-                "iterations": float(outcome.iterations),
-                "usd": outcome.usd,
+                "findings": float(len(findings)),
+                "from_rules": float(from_rules),
+                "agent_called": float(consulted_agent),
+                "usd": usd,
             },
         )
+
+
+def _resolve_counterparty(fields: dict[str, Any], threshold: float) -> Match:
+    def value(name: str) -> str | None:
+        entry = fields.get(name)
+        raw = entry.get("value") if isinstance(entry, dict) else None
+        return str(raw) if raw is not None else None
+
+    return resolve(
+        value("counterparty_name"),
+        registration_id=value("counterparty_registration_id"),
+        threshold=threshold,
+    )
