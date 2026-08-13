@@ -30,6 +30,9 @@ deviation regardless of size.
 Initial terms of **12 to 36 months** are standard. Anything beyond 36 months
 requires Procurement approval, because it outlives our budgeting horizon.
 
+The term runs from the effective date, so a contract whose effective date cannot
+be determined has no determinable term either, and is a deviation.
+
 ## §2.2 Automatic renewal
 
 **Automatic renewal is not accepted.** Renewal must require a positive written

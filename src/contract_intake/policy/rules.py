@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from contract_intake.config import Settings
-from contract_intake.extract.schema import DECISION_BEARING, REQUIRED_FOR_AUTO_APPROVAL
+from contract_intake.extract.schema import DECISION_BEARING
 from contract_intake.status import Route
 
 RULES_VERSION = 1
@@ -92,7 +92,14 @@ class Evidence:
 # rule runs, so a reviewer sees all the problems at once rather than the first.
 
 
+#: The severities the agent is allowed to emit. Anything outside this set is
+#: treated as blocking: the model picks the label, and a typo, a new word or a
+#: capitalisation used to mean the finding was recorded and then ignored.
+KNOWN_SEVERITIES = frozenset({"high", "medium", "low"})
+
+
 def rule_high_severity_findings(ev: Evidence, _s: Settings) -> list[Reason]:
+    """High findings, plus anything whose severity this code does not recognise."""
     return [
         Reason(
             rule="high_severity_finding",
@@ -101,7 +108,7 @@ def rule_high_severity_findings(ev: Evidence, _s: Settings) -> list[Reason]:
             fields=(str(f.get("field", "")),) if f.get("field") else (),
         )
         for f in ev.findings
-        if f.get("severity") == "high"
+        if str(f.get("severity", "")).strip().casefold() not in KNOWN_SEVERITIES - {"high"}
     ]
 
 
@@ -115,7 +122,28 @@ def rule_medium_severity_findings(ev: Evidence, _s: Settings) -> list[Reason]:
             fields=(str(f.get("field", "")),) if f.get("field") else (),
         )
         for f in ev.findings
-        if f.get("severity") == "medium"
+        if str(f.get("severity", "")).strip().casefold() == "medium"
+    ]
+
+
+def rule_low_severity_findings(ev: Evidence, _s: Settings) -> list[Reason]:
+    """Low findings block as well; severity only orders the queue.
+
+    The agent runs only on documents where every deterministic check already
+    passed, so anything it reports is by construction a judgement the code could
+    not make. Letting the model mark such a thing "low" and have it disappear
+    hands the routing decision to the word it chose, which is exactly what the
+    system prompt tells it that it is not doing.
+    """
+    return [
+        Reason(
+            rule="low_severity_finding",
+            message=f"{f.get('field', 'document')}: {f.get('explanation', '')}".strip(),
+            citation=str(f.get("citation", "")),
+            fields=(str(f.get("field", "")),) if f.get("field") else (),
+        )
+        for f in ev.findings
+        if str(f.get("severity", "")).strip().casefold() == "low"
     ]
 
 
@@ -142,13 +170,22 @@ def rule_unresolved_counterparty(ev: Evidence, s: Settings) -> list[Reason]:
 
 
 def rule_suspended_counterparty(ev: Evidence, _s: Settings) -> list[Reason]:
-    """§7.1 -- never auto-approve a suspended supplier, whatever the terms."""
-    if ev.counterparty_status != "suspended":
+    """§7.1 -- never auto-approve a supplier the registry does not call approved.
+
+    Tested as an allow-list rather than against the literal string "suspended".
+    The registry is free to grow a status -- "under_review", "terminated",
+    "blocked" -- and every one of those used to auto-approve, as did a
+    counterparty id that no longer resolves to any registry entry at all, which
+    is what removing a vendor from the file looks like from here.
+    """
+    if ev.counterparty_status == "approved":
         return []
     return [
         Reason(
             rule="suspended_counterparty",
-            message=f"{ev.counterparty_id} is suspended in the registry",
+            message=(
+                f"{ev.counterparty_id} is {ev.counterparty_status!r} in the registry, not approved"
+            ),
             citation="§7.1",
             fields=("counterparty_name",),
         )
@@ -157,7 +194,9 @@ def rule_suspended_counterparty(ev: Evidence, _s: Settings) -> list[Reason]:
 
 def rule_low_confidence_required_fields(ev: Evidence, s: Settings) -> list[Reason]:
     weak = [
-        name for name in REQUIRED_FOR_AUTO_APPROVAL if ev.confidence(name) < s.min_field_confidence
+        name
+        for name in DECISION_BEARING
+        if ev.field(name).get("value") is not None and ev.confidence(name) < s.min_field_confidence
     ]
     if not weak:
         return []
@@ -266,6 +305,7 @@ ALL_RULES: tuple[Callable[[Evidence, Settings], list[Reason]], ...] = (
     rule_unresolved_counterparty,
     rule_high_severity_findings,
     rule_medium_severity_findings,
+    rule_low_severity_findings,
     rule_unsupported_quotes,
     rule_low_confidence_required_fields,
     rule_wholly_unverifiable,

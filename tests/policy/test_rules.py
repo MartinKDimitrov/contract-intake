@@ -74,10 +74,25 @@ def test_any_finding_blocks_auto_approval(settings, severity: str) -> None:
     assert "governing_law" in decision.blocking_fields
 
 
-def test_a_low_severity_finding_does_not_block(settings) -> None:
-    """Not everything worth saying is worth stopping for."""
-    decision = decide(clean(findings=(finding("low"),)), settings)
-    assert decision.route is Route.AUTO_APPROVED
+def test_a_low_severity_finding_still_blocks(settings) -> None:
+    """The agent does not get to route by choosing an adjective.
+
+    This asserted the opposite. But the agent runs only where every
+    deterministic check already passed, so any finding it returns is a
+    judgement the code could not make -- and "low" made it vanish. Severity
+    now orders the queue and nothing else.
+    """
+    decision = decide(clean(findings=[finding("low", citation="§3.3")]), settings)
+
+    assert decision.route is Route.NEEDS_REVIEW
+    assert [r.rule for r in decision.reasons] == ["low_severity_finding"]
+
+
+def test_an_unrecognised_severity_blocks_rather_than_vanishing(settings) -> None:
+    """A label outside the vocabulary used to mean the finding was ignored."""
+    for severity in ("critical", "HIGH", "", None):
+        decision = decide(clean(findings=[finding(severity)]), settings)
+        assert decision.route is Route.NEEDS_REVIEW, severity
 
 
 def test_the_finding_citation_survives_into_the_reason(settings) -> None:

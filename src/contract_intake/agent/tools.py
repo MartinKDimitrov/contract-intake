@@ -90,6 +90,10 @@ class ToolBox:
             if match.vendor is None:
                 payload = {
                     "resolved": False,
+                    # "conflict" and "none" are different situations: one is an
+                    # unknown supplier, the other is a registration number and a
+                    # name pointing at two different companies.
+                    "matched_on": match.matched_on,
                     "score": round(match.score, 3),
                     "reason": match.reason,
                     "near_misses": [{"name": n, "score": round(s, 3)} for n, s in match.runners_up],

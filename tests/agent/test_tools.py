@@ -74,9 +74,21 @@ async def test_registry_status_reaches_the_agent(tools) -> None:
 
 async def test_the_registration_number_is_passed_through(tools) -> None:
     result = await call(
-        tools, "resolve_counterparty", name="unrecognisable", registration_id="HRB 84421"
+        tools, "resolve_counterparty", name="NordWind Logistics Ltd.", registration_id="HRB 84421"
     )
     assert result["matched_on"] == "registration_id"
+
+
+async def test_a_registration_number_that_contradicts_the_name_resolves_to_nobody(tools) -> None:
+    """The agent must see the disagreement rather than a confident wrong answer."""
+    result = await call(
+        tools,
+        "resolve_counterparty",
+        name="Levant Shipping Agency SAL",
+        registration_id="HRB 84421",
+    )
+    assert result["matched_on"] == "conflict"
+    assert not result["resolved"]
 
 
 # -- search_policy ----------------------------------------------------------

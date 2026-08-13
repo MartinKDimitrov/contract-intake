@@ -140,6 +140,13 @@ def load_registry(path: Path | None = None) -> tuple[Vendor, ...]:
     )
 
 
+def name_agreement(name: str, vendor: Vendor) -> float:
+    """How well a stated name matches one registry entry, on the same scale as resolve()."""
+    labels = [normalise_company(label) for label in (vendor.legal_name, *vendor.aliases)]
+    query = normalise_company(name)
+    return max((fuzz.token_sort_ratio(query, label) / 100.0 for label in labels), default=0.0)
+
+
 def resolve(
     name: str | None,
     *,
@@ -149,9 +156,15 @@ def resolve(
 ) -> Match:
     """Resolve a counterparty name to a registry entry.
 
-    The registration number, when present and matching, is decisive -- it is an
-    identifier, not a description, and a name that disagrees with it is a
-    drafting error rather than a different company.
+    The registration number is an identifier rather than a description, so a
+    match on it is strong evidence -- but it used to be decisive on its own,
+    and that is a hole rather than a shortcut. Any name at all beside another
+    supplier's registration number resolved to that supplier, which turned one
+    mistyped or borrowed number into a path from a *suspended* counterparty to
+    an approved one, silently and at score 1.00.
+
+    So the two have to agree. When they do not, nothing is resolved: the
+    disagreement is itself the finding, and §7.2 sends it to a person.
     """
     vendors = registry if registry is not None else load_registry()
 
@@ -161,7 +174,22 @@ def resolve(
     if registration_id:
         exact = _by_registration(registration_id, vendors)
         if exact is not None:
-            return Match(exact, 1.0, "registration_id", f"registration {registration_id} is unique")
+            agreement = name_agreement(name, exact)
+            if agreement >= threshold:
+                return Match(
+                    exact,
+                    1.0,
+                    "registration_id",
+                    f"registration {registration_id} is unique, and the name agrees "
+                    f"({agreement:.2f})",
+                )
+            return Match(
+                None,
+                agreement,
+                "conflict",
+                f"registration {registration_id} belongs to {exact.legal_name!r}, but the "
+                f"contract names {name.strip()!r} (agreement {agreement:.2f})",
+            )
 
     candidates: dict[str, Vendor] = {}
     for vendor in vendors:

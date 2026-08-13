@@ -31,6 +31,23 @@ log = logging.getLogger(__name__)
 DATA = Path(__file__).parent.parent / "knowledge" / "data" / "playbook_checks.json"
 
 
+class UnknownOperatorError(ValueError):
+    """A check names an operator this module cannot evaluate."""
+
+
+#: Leading noise that varies without changing which jurisdiction is meant.
+#: Applied before comparing a governing law against the allow-list.
+_JURISDICTION_NOISE = (
+    "the laws of ",
+    "laws of ",
+    "the law of ",
+    "law of ",
+    "the republic of ",
+    "republic of ",
+    "the ",
+)
+
+
 @dataclass(frozen=True, slots=True)
 class Check:
     id: str
@@ -52,6 +69,12 @@ class Check:
 def load_checks(path: Path | None = None) -> tuple[Check, ...]:
     raw = json.loads((path or DATA).read_text(encoding="utf-8"))
     known = {"id", "section", "field", "op", "severity", "message", "applies_to_categories"}
+    for c in raw["checks"]:
+        if c["op"] not in OPERATORS:
+            raise UnknownOperatorError(
+                f"check {c['id']!r} uses operator {c['op']!r}, which is not implemented. "
+                "An operator nobody evaluates is a check that silently passes."
+            )
     return tuple(
         Check(
             id=c["id"],
@@ -83,9 +106,10 @@ def evaluate(
     for check in checks if checks is not None else load_checks():
         if not check.applies(vendor_category):
             continue
-        entry = extraction.get(check.field)
-        value = entry.get("value") if isinstance(entry, dict) else None
-        if _passes(check, value):
+        raw_entry = extraction.get(check.field)
+        entry = raw_entry if isinstance(raw_entry, dict) else {}
+        value = entry.get("value")
+        if _passes(check, entry):
             continue
         findings.append(
             {
@@ -100,40 +124,82 @@ def evaluate(
     return findings
 
 
-def _passes(check: Check, value: Any) -> bool:
+#: Every operator this module implements. A check naming anything else is a
+#: startup error rather than a warning, because the old behaviour -- log and
+#: return True -- turned a typo in the playbook into a check that always passed.
+OPERATORS = frozenset(
+    {
+        "required",
+        "equals",
+        "between",
+        "lte",
+        "gte",
+        "matches_any",
+        "matches_none",
+        "currency_stated",
+    }
+)
+
+
+def canonical_jurisdiction(value: str) -> str:
+    """Reduce a stated governing law to something comparable to the allow-list.
+
+    Substring matching used to do this job and made "New South Wales, Australia"
+    an approved jurisdiction, because "wales" is in the list on account of
+    England & Wales. Matching the whole canonical string instead fails closed:
+    a rendering this does not recognise becomes a deviation and goes to a
+    person, which is the right direction to be wrong in for a jurisdiction.
+    """
+    text = " ".join(str(value).casefold().split()).strip(" .,;")
+    for prefix in _JURISDICTION_NOISE:
+        if text.startswith(prefix):
+            text = text[len(prefix) :]
+    return text.replace(" and ", " & ").strip()
+
+
+def _passes(check: Check, entry: dict[str, Any]) -> bool:
+    """Evaluate one check against one extracted field.
+
+    Absence fails by default. It used to pass, on the reasoning that a `required`
+    check would catch it -- but that reasoning was spread across two files and
+    was wrong for §2.3, where a contract with no termination-for-convenience
+    right at all sailed through a ceiling of 90 days. A check that cannot see a
+    value has not checked it, so the two places where silence is genuinely
+    acceptable now say so with `absent_ok`.
+    """
     p = check.params
+    value = entry.get("value")
+
+    if value is None:
+        return bool(p.get("absent_ok", False)) and not p.get("absent_fails", False)
 
     match check.op:
         case "required":
-            return value is not None
+            return True  # a non-None value is all this asks
         case "equals":
-            # A field the document does not state cannot equal anything, so an
-            # absent value passes by default -- absence is caught by a `required`
-            # check where it matters. `absent_fails` inverts that for the cases
-            # where silence *is* the deviation: a contract with no data-protection
-            # clause has not satisfied the requirement, it has ignored it.
-            if value is None:
-                return not p.get("absent_fails", False)
             return bool(value == p["expected"])
-        case "between":
-            return value is None or _number(value) is None or p["min"] <= _number(value) <= p["max"]
-        case "lte":
-            return value is None or _number(value) is None or _number(value) <= p["limit"]
-        case "gte":
-            return value is None or _number(value) is None or _number(value) >= p["limit"]
+        case "currency_stated":
+            currency = str(entry.get("currency") or "").strip().upper()
+            allowed = {str(a).upper() for a in p.get("allowed", ())}
+            return bool(currency) and (not allowed or currency in allowed)
+        case "between" | "lte" | "gte":
+            number = _number(value)
+            if number is None:
+                # A value the checker cannot parse is a value it did not check.
+                return False
+            if check.op == "between":
+                return bool(p["min"] <= number <= p["max"])
+            if check.op == "lte":
+                return bool(number <= p["limit"])
+            return bool(number >= p["limit"])
         case "matches_any":
-            if value is None:
-                return True
-            text = str(value).casefold()
-            return any(a in text for a in p["allowed"])
+            allowed = {canonical_jurisdiction(a) for a in p["allowed"]}
+            return canonical_jurisdiction(value) in allowed
         case "matches_none":
-            if value is None:
-                return True
             text = str(value).casefold()
-            return not any(f in text for f in p["forbidden"])
-        case _:
-            log.warning("unknown check operator %r in %s; skipping", check.op, check.id)
-            return True
+            return not any(str(f).casefold() in text for f in p["forbidden"])
+
+    raise UnknownOperatorError(check.op)  # unreachable: load_checks validates
 
 
 def _number(value: Any) -> float | None:

@@ -102,7 +102,33 @@ def test_registration_number_beats_the_name() -> None:
 
 @pytest.mark.parametrize("written", ["HRB 84421", "hrb84421", "HRB-84421", "HRB  84421"])
 def test_registration_number_formatting_does_not_matter(written: str) -> None:
-    match = resolve("something unrecognisable", registration_id=written)
+    """How the number is punctuated must not change what it resolves to.
+
+    The name here used to read "something unrecognisable", which made this a
+    test of the very hole it was hiding: a registration number resolved on its
+    own, so any name at all -- including a *suspended* supplier's -- landed on
+    whichever vendor the number belonged to. The name now has to agree; the
+    disagreement case is its own test below.
+    """
+    match = resolve("NordWind Logistics Ltd.", registration_id=written)
+    assert match.resolved
+    assert match.vendor is not None
+    assert match.vendor.legal_name == NORDWIND
+
+
+def test_a_name_that_disagrees_with_the_registration_resolves_to_nobody() -> None:
+    """One borrowed number was a path from a suspended supplier to approved."""
+    match = resolve("Levant Shipping Agency SAL", registration_id="HRB 84421")
+
+    assert not match.resolved
+    assert match.matched_on == "conflict"
+    assert "Levant" in match.reason and NORDWIND in match.reason
+
+
+def test_a_scan_mangled_name_still_resolves_on_its_registration() -> None:
+    """The reason the number is consulted at all must keep working."""
+    match = resolve("NordWlnd Logisttk GmbH", registration_id="HRB 84421")
+
     assert match.resolved
     assert match.vendor is not None
     assert match.vendor.legal_name == NORDWIND

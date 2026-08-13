@@ -28,7 +28,8 @@
       "op": "equals",
       "expected": false,
       "severity": "medium",
-      "message": "the agreement renews automatically; renewal must require a written act by both parties"
+      "message": "the agreement renews automatically; renewal must require a written act by both parties",
+      "absent_ok": true
     },
     {
       "id": "termination_notice_ceiling",
@@ -66,8 +67,8 @@
         "germany",
         "austria",
         "netherlands",
-        "england",
-        "wales"
+        "england & wales",
+        "england and wales"
       ],
       "severity": "high",
       "message": "governing law {value!r} is outside the approved jurisdictions"
@@ -85,7 +86,8 @@
         "bermuda"
       ],
       "severity": "high",
-      "message": "governing law {value!r} is an offshore jurisdiction of elevated severity"
+      "message": "governing law {value!r} is an offshore jurisdiction of elevated severity",
+      "absent_ok": true
     },
     {
       "id": "dpa_required_for_processors",
@@ -109,6 +111,31 @@
       "op": "required",
       "severity": "medium",
       "message": "no effective date is stated, so no term can be computed"
+    },
+    {
+      "id": "liability_currency_stated",
+      "section": "§1.2",
+      "field": "liability_cap",
+      "op": "currency_stated",
+      "allowed": [
+        "EUR",
+        "BGN",
+        "USD",
+        "GBP",
+        "CHF"
+      ],
+      "severity": "high",
+      "message": "the liability cap states no ISO 4217 currency, so its size cannot be judged"
+    },
+    {
+      "id": "liability_not_excluded",
+      "section": "§3.2",
+      "field": "liability_uncapped",
+      "op": "equals",
+      "expected": false,
+      "absent_ok": true,
+      "severity": "high",
+      "message": "the contract excludes liability rather than capping it"
     }
   ]
 }
