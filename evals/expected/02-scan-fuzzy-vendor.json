@@ -1,0 +1,17 @@
+{
+  "_note": "Commercially compliant, but every value rests on a photograph and the name is mangled.",
+  "document_kind": "contract",
+  "route": "needs_review",
+  "deviations": [],
+  "counterparty_id": "VEN-0142",
+  "fields": {
+    "counterparty_name": "NordWind Logistics Ltd.",
+    "effective_date": "2026-05-21",
+    "term_months": 18,
+    "auto_renewal": false,
+    "termination_notice_days": 90,
+    "payment_terms_days": 45,
+    "liability_cap": 250000,
+    "governing_law": "Germany"
+  }
+}

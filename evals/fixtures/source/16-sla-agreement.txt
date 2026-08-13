@@ -1,0 +1,26 @@
+SOFTWARE MAINTENANCE AND SLA AGREEMENT
+
+Contract Ref: SLA-2026-MRH
+
+Parties:
+- Meridian Rail Holdings AD ("Client")
+- TrackTech Systems B.V., Netherlands ("Provider")
+
+Effective Date: 1 July 2026
+
+1. SCOPE OF SERVICES
+Provider agrees to supply Level 2 and Level 3 software maintenance for the RailFleet Manager Platform.
+
+2. SERVICE LEVEL TARGETS
+- Severity 1 (Critical Outage): Initial response within 1 hour; resolution target 4 hours.
+- Severity 2 (Major Impairment): Initial response within 4 hours; resolution target 24 hours.
+- Severity 3 (Minor Bug): Initial response within 24 hours; resolution in next scheduled release.
+
+3. FEES AND BILLING
+Annual maintenance fee: EUR 36,000, payable quarterly in advance (EUR 9,000 per quarter).
+
+4. PENALTIES
+Failure to meet Severity 1 resolution target on more than 2 occasions per calendar quarter results in a 5% credit on the subsequent quarterly invoice.
+
+5. JURISDICTION
+Governed by the laws of the Netherlands.

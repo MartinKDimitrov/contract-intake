@@ -57,9 +57,17 @@ knowledge:  ## Rebuild the policy index and print registry stats
 costs:  ## Print the cost ledger summary
 	$(PY) -m contract_intake.cli costs
 
+.PHONY: triage
+triage:  ## Classify every fixture and corpus document (free)
+	$(PY) evals/run.py --triage
+
+.PHONY: corpus
+corpus:  ## Download the real EU document corpus
+	$(PY) evals/corpus.py
+
 .PHONY: eval
-eval:  ## Run the extraction/routing eval harness
-	$(PY) -m pytest evals -q -s
+eval:  ## Measure extraction accuracy and the knowledge base contribution (costs money)
+	$(PY) evals/run.py
 
 .PHONY: clean
 clean:  ## Remove venv, db and caches

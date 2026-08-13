@@ -1,0 +1,24 @@
+CREDIT NOTE
+
+Credit Note No: CN-2026-0012
+Date: 12 June 2026
+Original Invoice Ref: 2026-00841
+
+ISSUER:
+Nordwind Logistik GmbH
+Hafenstrasse 19, 20359 Hamburg, Germany
+
+RECIPIENT:
+Meridian Rail Holdings AD
+12 Tsarigradsko Shose, Sofia 1784, Bulgaria
+
+Reason for Credit: Overcharge on Customs brokerage items in May billing.
+
+Description                   | Qty | Adjusted Amount (EUR)
+-----------------------------------------------------------
+Adjustment for Brokerage Fee  | 1   | - 220.00
+VAT (20%)                      |     | -  44.00
+-----------------------------------------------------------
+Total Credit Amount:          |     | - 264.00
+
+This credit amount will be applied against your next pending invoice balance.

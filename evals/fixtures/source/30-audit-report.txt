@@ -1,0 +1,36 @@
+QUALITY AUDIT REPORT
+
+Audit Reference: QMS-2026-1587
+Audit Date: 19 June 2026
+
+Audited Organization:
+TransBalkan Rail EOOD
+Plovdiv, Bulgaria
+
+Audit Scope:
+Rolling stock maintenance, spare parts management, and operational safety procedures.
+
+Applicable Standard:
+ISO 9001:2015 / ECM Regulation (EU) 2019/779
+
+Summary of Results:
+The audit identified two minor non-conformities and four observations.
+
+Minor Non-Conformities:
+1. Calibration certificates for three measuring devices were expired.
+2. Training records for two newly hired technicians were incomplete.
+
+Observations:
+- Improved digital logging of daily inspections recommended.
+- Supplier performance scoring matrix could be expanded.
+- Risk assessment for temporary storage areas needs update.
+- Document control procedure for work instructions requires clarification.
+
+Corrective Action Deadline:
+15 August 2026
+
+Lead Auditor:
+M. Hoffmann
+
+Final Status:
+Corrective action plan accepted.

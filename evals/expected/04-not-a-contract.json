@@ -1,0 +1,8 @@
+{
+  "_note": "An invoice. Triage turns it away before a model is involved.",
+  "document_kind": "other",
+  "route": "rejected",
+  "deviations": [],
+  "counterparty_id": null,
+  "fields": {}
+}

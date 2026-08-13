@@ -1,0 +1,21 @@
+RAILWAY LEASE AGREEMENT / MIETVERTRAG FÜR EISENBAHNWAGEN
+
+Dated / Datum: 10 April 2026
+
+Parties / Parteien:
+1. MRH Fleet Operations GmbH, Austria ("Lessor" / "Vermieter")
+2. Meridian Rail Holdings AD, Bulgaria ("Lessee" / "Mieter")
+
+Clause 1: Object of Lease / § 1 Mietgegenstand
+En: The Lessor leases to the Lessee 10 Freight Wagons type Type Eanos.
+De: Der Vermieter vermietet an den Mieter 10 Güterwagen vom Typ Eanos.
+
+Clause 2: Monthly Rent / § 2 Monatlicher Mietzins
+En: The monthly rent per wagon is EUR 850 (total EUR 8,500/month).
+De: Der monatliche Mietzins pro Wagen beträgt EUR 850 (gesamt EUR 8.500/Monat).
+
+Clause 3: Maintenance / § 3 Instandhaltung
+En: Maintenance responsibilities shall follow ECM standards.
+De: Die Instandhaltungsverantwortung richtet sich nach den ECM-Standards.
+
+Governing Law / Anwendbares Recht: Austrian Law / Österreichisches Recht.

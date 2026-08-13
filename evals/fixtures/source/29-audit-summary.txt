@@ -1,0 +1,31 @@
+QUALITY AUDIT SUMMARY
+
+Audit Reference: QMS-2026-1204
+Audit Date: 4 August 2026
+
+Audited Organization:
+Danube Freight AD
+Ruse, Bulgaria
+
+Audit Scope:
+Procurement, maintenance planning, document control, and rail freight operations.
+
+Applicable Standard:
+ISO 9001:2015
+
+Summary of Results:
+The audit identified three minor non-conformities and five opportunities for improvement.
+
+Minor Non-Conformities:
+1. Two maintenance records lacked secondary approval.
+2. One supplier evaluation was not updated within the required review period.
+3. A controlled document register contained one outdated revision.
+
+Corrective Action Deadline:
+30 September 2026
+
+Lead Auditor:
+R. Schneider
+
+Final Status:
+Corrective action plan required.

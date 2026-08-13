@@ -1,0 +1,28 @@
+PURCHASE ORDER
+PO Number: PO-2026-90412
+Date: 10 June 2026
+
+BUYER:
+Meridian Rail Holdings AD
+UIC 205118874
+12 Tsarigradsko Shose, Sofia 1784, Bulgaria
+
+VENDOR:
+Apex Telematics Inc.
+450 Technology Way, San Jose, CA 95110, USA
+
+Items:
+----------------------------------------------------------------------
+Item # | Description                     | Qty | Unit Price | Total
+----------------------------------------------------------------------
+APX-01 | GPS Tracking Modules (Rail)     | 50  | $ 120.00   | $ 6,000.00
+APX-02 | Heavy-Duty Sensor Harnesses    | 100 | $  35.00   | $ 3,500.00
+APX-03 | Firmware License (Perpetual)   | 1   | $ 1,500.00 | $ 1,500.00
+----------------------------------------------------------------------
+Subtotal: $ 11,000.00
+Shipping & Handling: $ 450.00
+Total Amount: $ 11,450.00
+
+Delivery Date: On or before 15 July 2026
+Payment Terms: Net 30 days upon delivery
+Authorized Signature: _______________________

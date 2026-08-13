@@ -1,0 +1,20 @@
+{
+  "_note": "Compliant on every threshold. The only path to auto-approval.",
+  "document_kind": "contract",
+  "route": "auto_approved",
+  "deviations": [],
+  "counterparty_id": "VEN-0142",
+  "fields": {
+    "counterparty_name": "Nordwind Logistik GmbH",
+    "counterparty_registration_id": "HRB 84421",
+    "customer_name": "Meridian Rail Holdings AD",
+    "effective_date": "2026-03-14",
+    "term_months": 24,
+    "auto_renewal": false,
+    "termination_notice_days": 60,
+    "payment_terms_days": 45,
+    "liability_cap": 500000,
+    "governing_law": "Bulgaria",
+    "dpa_present": true
+  }
+}

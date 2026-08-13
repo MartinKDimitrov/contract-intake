@@ -1,0 +1,25 @@
+PURCHASE ORDER
+
+PO Number: PO-2026-3055
+Issue Date: 14 July 2026
+
+Buyer:
+Carpathian Logistics SA
+Bucharest, Romania
+
+Supplier:
+Alpine Rail Components GmbH
+Graz, Austria
+
+Items:
+1. Wheelset complete (axle + wheels) — 16 units — EUR 4,850/unit
+2. Brake pad sets — 80 units — EUR 62/unit
+3. Slack adjuster units — 16 units — EUR 385/unit
+
+Subtotal: EUR 87,360
+VAT: 0% (Intra-Community supply)
+Delivery: 45 calendar days from order confirmation
+Payment Terms: 45 days from invoice date
+
+Authorized by:
+M. Ionescu, Procurement Director

@@ -1,0 +1,30 @@
+WAGON INSPECTION AND MAINTENANCE RECORD
+
+Report No.: WIM-2026-1142
+Inspection Date: 11 August 2026
+
+Operator:
+Meridian Rail Transport AD
+
+Location:
+Sofia Technical Depot
+
+Asset:
+Wagon ID: MRT-30987
+Type: Hbbins
+
+Inspection Findings:
+- Brake cylinders: within tolerance
+- Bogie frames: no cracks detected
+- Floor condition: minor wear, still serviceable
+- Side doors: lubrication required
+
+Corrective Action:
+Side doors lubricated and functional test completed successfully.
+
+Next Scheduled Inspection:
+11 February 2027
+
+Technician:
+G. Nikolov
+Certified ECM Level 2

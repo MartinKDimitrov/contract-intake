@@ -25,52 +25,40 @@ from pathlib import Path
 FIXTURES = Path(__file__).parent
 
 
-def _escape(text: str) -> str:
-    return text.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+FONT = FIXTURES / "fonts" / "DejaVuSans.ttf"
 
 
 def write_text_pdf(path: Path, pages: list[str], *, font_size: int = 10) -> Path:
-    """Write a PDF with a real text layer, one entry in ``pages`` per page."""
-    objects: list[bytes] = []
-    page_ids = [4 + 2 * i for i in range(len(pages))]
+    """Write a PDF with a real, extractable text layer.
 
-    kids = " ".join(f"{pid} 0 R" for pid in page_ids)
-    objects.append(b"<< /Type /Catalog /Pages 2 0 R >>")
-    objects.append(f"<< /Type /Pages /Kids [{kids}] /Count {len(pages)} >>".encode())
-    objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+    Uses an embedded Unicode font rather than one of the fourteen standard PDF
+    fonts. Those are Latin-1 only: a Cyrillic document written with Helvetica
+    round-trips into glyph codes, which meant the Bulgarian fixture was silently
+    testing a corrupted file rather than Bulgarian.
 
-    for index, body in enumerate(pages):
-        content_id = page_ids[index] + 1
-        objects.append(
-            (
-                f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
-                f"/Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>"
-            ).encode()
+    Font embedding done properly needs a CIDFontType2 descendant, Identity-H
+    encoding, subsetting and a ToUnicode CMap -- without that last one the text
+    is drawn correctly and still extracts as glyph ids. That is not something to
+    hand-roll, so fpdf2 does it, as a dev-only dependency.
+    """
+    from fpdf import FPDF
+
+    pdf = FPDF(format="A4")
+    pdf.set_auto_page_break(auto=False)
+    pdf.add_font("body", fname=str(FONT))
+
+    for body in pages:
+        pdf.add_page()
+        pdf.set_font("body", size=font_size)
+        pdf.set_xy(18, 18)
+        pdf.multi_cell(
+            w=pdf.epw - 20,
+            h=font_size * 0.52,
+            text=body.strip("\n"),
+            align="L",
         )
-        lines = body.strip("\n").split("\n")
-        stream = [f"BT /F1 {font_size} Tf {font_size + 4} TL 56 780 Td"]
-        for line in lines:
-            stream.append(f"({_escape(line)}) Tj T*")
-        stream.append("ET")
-        payload = "\n".join(stream).encode()
-        objects.append(b"<< /Length %d >>\nstream\n%s\nendstream" % (len(payload), payload))
 
-    out = bytearray(b"%PDF-1.4\n")
-    offsets: list[int] = []
-    for number, body in enumerate(objects, start=1):
-        offsets.append(len(out))
-        out += f"{number} 0 obj\n".encode() + body + b"\nendobj\n"
-
-    xref_at = len(out)
-    out += f"xref\n0 {len(objects) + 1}\n".encode()
-    out += b"0000000000 65535 f \n"
-    for offset in offsets:
-        out += f"{offset:010d} 00000 n \n".encode()
-    out += (
-        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_at}\n%%EOF\n"
-    ).encode()
-
-    path.write_bytes(bytes(out))
+    pdf.output(str(path))
     return path
 
 
@@ -239,6 +227,28 @@ DOCUMENTS = {
 }
 
 
+SOURCE = FIXTURES / "source"
+
+
+def render_source_documents(out: Path) -> list[str]:
+    """Render the plain-text corpus in `source/` into PDFs.
+
+    Those documents are the varied half of the corpus -- amendments, a bilingual
+    lease, an invoice in Cyrillic, certificates and quotes that are not contracts
+    at all. They are kept as text so the wording is reviewable in a diff, and
+    rendered here so the pipeline sees the same kind of file it sees in the wild.
+    """
+    if not SOURCE.exists():
+        return []
+    made: list[str] = []
+    for path in sorted(SOURCE.glob("*.txt")):
+        body = path.read_text(encoding="utf-8")
+        pages = [body[i : i + 2600] for i in range(0, len(body), 2600)] or [body]
+        write_text_pdf(out / f"{path.stem}.pdf", pages, font_size=9)
+        made.append(path.stem)
+    return made
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=FIXTURES)
@@ -252,6 +262,10 @@ def main() -> int:
         else:
             write_text_pdf(path, pages)
         print(f"{path.name:<28} {shape:<5} {path.stat().st_size / 1024:6.1f} KB")
+
+    for name in render_source_documents(args.out):
+        size = (args.out / f"{name}.pdf").stat().st_size / 1024
+        print(f"{name + '.pdf':<28} {'text':<5} {size:6.1f} KB")
     return 0
 
 

@@ -1,0 +1,29 @@
+RAIL WAGON MAINTENANCE REPORT
+
+Report No.: MNT-2026-0918
+Inspection Date: 29 July 2026
+
+Operator:
+Danube Freight AD
+
+Location:
+Ruse Maintenance Facility
+
+Asset:
+Wagon ID: DFR-78421
+Type: Eanos
+
+Inspection Findings:
+- Brake system: operational
+- Wheel profile: within permitted limits
+- Coupling equipment: operational
+- Door locking mechanism: minor adjustment required
+
+Corrective Action:
+Door locking mechanism adjusted and tested successfully.
+
+Next Scheduled Inspection:
+29 January 2027
+
+Technician:
+P. Stoyanov

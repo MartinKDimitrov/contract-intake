@@ -1,0 +1,24 @@
+{
+  "_note": "Four thresholds breached. Kestrel is data_analytics, so the missing DPA counts.",
+  "document_kind": "contract",
+  "route": "needs_review",
+  "deviations": [
+    "\u00a72.2",
+    "\u00a73.2",
+    "\u00a74.1",
+    "\u00a75.1"
+  ],
+  "counterparty_id": "VEN-0207",
+  "fields": {
+    "counterparty_name": "Kestrel Analytics Ltd",
+    "counterparty_registration_id": "09912447",
+    "effective_date": "2026-04-02",
+    "term_months": 12,
+    "auto_renewal": true,
+    "termination_notice_days": 90,
+    "payment_terms_days": 90,
+    "liability_cap": null,
+    "governing_law": "Cayman Islands",
+    "dpa_present": null
+  }
+}

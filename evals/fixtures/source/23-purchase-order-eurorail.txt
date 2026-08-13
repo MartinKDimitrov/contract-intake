@@ -1,0 +1,25 @@
+PURCHASE ORDER
+
+PO Number: PO-2026-1847
+Issue Date: 6 June 2026
+
+Buyer:
+Black Sea Logistics AD
+Varna, Bulgaria
+
+Supplier:
+EuroRail Components s.r.o.
+Brno, Czech Republic
+
+Items:
+1. Brake Disc Set — 40 units — EUR 185/unit
+2. Coupling Assembly — 12 units — EUR 1,240/unit
+3. Inspection Kit — 25 units — EUR 96/unit
+
+Subtotal: EUR 34,720
+VAT: 20%
+Delivery: 30 calendar days from purchase order confirmation
+Payment Terms: 30 days from invoice date
+
+Authorized by:
+D. Georgiev, Procurement Manager
