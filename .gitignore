@@ -9,10 +9,10 @@ __pycache__/
 # runtime state: db, raw attachments, chroma index
 var/
 
-# fixtures are generated deterministically by evals/fixtures/generate.py,
+# rendered PDFs are derived deterministically by evals/render.py,
 # so the generator stays the source of truth rather than the binaries
-evals/fixtures/*.pdf
+evals/documents/rendered/
 
 .env
 .DS_Store
-evals/corpus/
+evals/documents/collected/

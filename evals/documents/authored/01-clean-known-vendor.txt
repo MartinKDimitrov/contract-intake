@@ -1,0 +1,49 @@
+MASTER SERVICES AGREEMENT
+
+This Master Services Agreement (the "Agreement") is entered into as of
+14 March 2026 (the "Effective Date") by and between:
+
+  Meridian Rail Holdings AD, UIC 205118874, of 12 Tsarigradsko Shose,
+  Sofia 1784, Bulgaria ("Customer"); and
+
+  Nordwind Logistik GmbH, HRB 84421, of Hafenstrasse 19, 20359 Hamburg,
+  Germany ("Supplier").
+
+WHEREAS the Supplier provides freight forwarding and customs brokerage
+services, and the Customer wishes to procure such services, the parties
+hereby agree as follows.
+
+1. TERM
+   This Agreement commences on the Effective Date and continues for an
+   initial term of twenty-four (24) months. It shall not renew
+   automatically; renewal requires a written agreement of both parties.
+
+2. CHARGES AND PAYMENT
+   The Customer shall pay each undisputed invoice within forty-five (45)
+   days of receipt.
+
+3. LIMITATION OF LIABILITY
+   The aggregate liability of either party under this Agreement shall not
+   exceed EUR 500,000.
+
+4. TERMINATION
+   Either party may terminate this Agreement for convenience upon sixty
+   (60) days written notice to the other party.
+
+5. CONFIDENTIALITY
+   Each party shall keep confidential all information disclosed by the
+   other and marked or reasonably understood to be confidential.
+
+6. DATA PROTECTION
+   The parties have executed a Data Processing Agreement, attached as
+   Annex B, which forms an integral part of this Agreement.
+
+7. GOVERNING LAW
+   This Agreement is governed by the laws of the Republic of Bulgaria.
+   The courts of Sofia shall have exclusive jurisdiction.
+
+IN WITNESS WHEREOF the parties have executed this Agreement.
+
+  For Meridian Rail Holdings AD          For Nordwind Logistik GmbH
+  ______________________                 ______________________
+  I. Petrova, CFO                        K. Brandt, Managing Director

@@ -1,6 +1,6 @@
 """The per-page text-versus-vision decision -- the largest cost lever there is.
 
-Runs against the generated fixtures rather than mocks: the thing being tested is
+Runs against the rendered documents rather than mocks: the thing being tested is
 whether a real PDF is read the way we think, and a mock cannot answer that.
 """
 
@@ -19,13 +19,13 @@ from contract_intake.pipeline.base import Advanced, Rejected, StageContext
 from contract_intake.pipeline.stage_03_load import LoadStage
 from contract_intake.status import Status
 
-FIXTURES = Path(__file__).resolve().parents[2] / "evals" / "fixtures"
-BORN_DIGITAL = FIXTURES / "01-clean-known-vendor.pdf"
-SCANNED = FIXTURES / "02-scan-fuzzy-vendor.pdf"
+RENDERED = Path(__file__).resolve().parents[2] / "evals" / "documents" / "rendered"
+BORN_DIGITAL = RENDERED / "01-clean-known-vendor.pdf"
+SCANNED = RENDERED / "02-scan-fuzzy-vendor.pdf"
 
 pytestmark = pytest.mark.skipif(
     not BORN_DIGITAL.exists(),
-    reason="fixtures not generated; run evals/fixtures/generate.py",
+    reason="documents not rendered; run evals/render.py",
 )
 
 

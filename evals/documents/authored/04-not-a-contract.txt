@@ -1,0 +1,14 @@
+INVOICE
+
+Invoice No: 2026-00841              Date: 3 June 2026
+Bill to: Meridian Rail Holdings AD
+
+Description                     Qty        Unit        Amount
+Freight forwarding, May 2026      1     8,400.00      8,400.00
+Customs brokerage                 3       220.00        660.00
+
+                                       Subtotal       9,060.00
+                                       VAT 20%        1,812.00
+                                       Amount due    10,872.00
+
+Payment due within 30 days. Remit to IBAN DE00 2005 0000 0000 0000 00.

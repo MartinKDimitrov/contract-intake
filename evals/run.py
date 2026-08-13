@@ -35,7 +35,8 @@ from contract_intake.loaders.document import load
 from contract_intake.policy.thresholds import evaluate
 
 ROOT = Path(__file__).parent
-FIXTURES = ROOT / "fixtures"
+DOCUMENTS = ROOT / "documents"
+RENDERED = DOCUMENTS / "rendered"
 EXPECTED = ROOT / "expected"
 
 NO_KB_PROMPT = """\
@@ -95,7 +96,7 @@ async def measure(name: str, *, llm: LLMClient, settings: Settings) -> DocResult
     )
 
     document = load(
-        FIXTURES / f"{name}.pdf", settings=settings, into=settings.data_dir / "eval" / name
+        RENDERED / f"{name}.pdf", settings=settings, into=settings.data_dir / "eval" / name
     )
     outcome = await extract(document, llm=llm, settings=settings)
     result.usd += outcome.usd
@@ -181,7 +182,7 @@ async def main() -> int:
     names = sorted(p.stem for p in EXPECTED.glob("*.json"))
     if args.only:
         names = [n for n in names if args.only in n]
-    names = [n for n in names if (FIXTURES / f"{n}.pdf").exists()]
+    names = [n for n in names if (RENDERED / f"{n}.pdf").exists()]
 
     results: list[DocResult] = []
     with session_scope() as session:
@@ -198,10 +199,10 @@ async def main() -> int:
     return 0
 
 
-CORPUS = ROOT / "corpus"
+COLLECTED = DOCUMENTS / "collected"
 
-#: Fixtures that are contracts. Everything else in the corpus must be turned away.
-CONTRACT_FIXTURES = frozenset(
+#: The documents that are contracts. Everything else must be turned away.
+CONTRACTS = frozenset(
     {
         "01-clean-known-vendor",
         "03-policy-deviations",
@@ -217,14 +218,28 @@ CONTRACT_FIXTURES = frozenset(
 )
 
 
+def _provenance() -> dict[str, str]:
+    """Map each rendered document back to the folder it came from.
+
+    Where a document came from decides what a result on it is worth, so the
+    report says it rather than averaging four provenances into one number.
+    """
+    where: dict[str, str] = {}
+    for path in DOCUMENTS.rglob("*.txt"):
+        folder = path.relative_to(DOCUMENTS).parent.as_posix()
+        where[path.stem.removesuffix(".scan")] = folder
+    return where
+
+
 def _triage_report() -> int:
     """Classify everything, spending nothing.
 
-    Two corpora with opposite jobs. The fixtures carry contracts that must get
-    through and lookalikes that must not. The TED corpus is entirely negative --
-    real EU procurement notices in three languages, none of them a contract --
-    and it is where a false positive would be expensive, since it buys an
-    extraction on a document that could never produce a contract record.
+    Documents with opposite jobs. The authored and generated ones carry
+    contracts that must get through and lookalikes that must not. The collected
+    corpus is entirely negative -- real EU procurement notices in five
+    languages, none of them a contract -- and it is where a false positive would
+    be expensive, since it buys an extraction on a document that could never
+    produce a contract record.
     """
     from collections import Counter
 
@@ -235,33 +250,46 @@ def _triage_report() -> int:
     print("TRIAGE  (zero tokens)")
     print("=" * 78)
 
+    where = _provenance()
     wrong: list[str] = []
-    scans = kept = 0
-    print("\ngenerated fixtures -- contracts that must pass, lookalikes that must not")
-    for path in sorted(FIXTURES.glob("*.pdf")):
+    scans = 0
+    seen: Counter[str] = Counter()
+    hits: Counter[str] = Counter()
+    for path in sorted(RENDERED.glob("*.pdf")):
         result = probe(path)
         if not result.has_text_layer:
             scans += 1
             continue
-        kept += 1
+        folder = where.get(path.stem, "unknown")
+        seen[folder] += 1
         verdict = classify_text(result.first_page_text)
-        expected = path.stem in CONTRACT_FIXTURES
+        expected = path.stem in CONTRACTS
         if expected != (verdict.kind == "contract"):
             wrong.append(f"{path.stem} -> {verdict.kind}")
-    contracts = len(CONTRACT_FIXTURES)
-    print(f"  {kept} documents: {contracts} contracts, {kept - contracts} lookalikes")
-    print(f"  {kept - len(wrong)}/{kept} correct" + (f"   wrong: {wrong}" if wrong else ""))
+        else:
+            hits[folder] += 1
+        if expected:
+            hits["#contracts"] += 1
+
+    print("\nauthored and generated -- contracts that must pass, lookalikes that must not")
+    for folder in sorted(seen):
+        print(f"  {folder + ':':<22} {hits[folder]:>3}/{seen[folder]:<3} correct")
+    kept = sum(seen.values())
+    print(
+        f"  {'total:':<22} {kept - len(wrong):>3}/{kept:<3} correct"
+        + (f"   wrong: {wrong}" if wrong else "")
+    )
     if scans:
         print(f"  ({scans} scanned, no text layer -- classified by stage 04 instead)")
 
-    if not CORPUS.exists() or not any(CORPUS.glob("*.pdf")):
-        print("\nno real corpus downloaded; run evals/corpus.py")
+    if not COLLECTED.exists() or not any(COLLECTED.glob("*.pdf")):
+        print("\nno real corpus downloaded; run make corpus")
         return 1 if wrong else 0
 
-    print("\nTED corpus -- real EU procurement notices, none of them contracts")
+    print("\ncollected -- real EU procurement notices, none of them contracts")
     by_language: dict[str, Counter[str]] = {}
     false_positives: list[str] = []
-    for path in sorted(CORPUS.glob("*.pdf")):
+    for path in sorted(COLLECTED.glob("*.pdf")):
         language = path.stem.split("-")[1]
         result = probe(path)
         verdict = classify_text(result.first_page_text)
@@ -297,7 +325,7 @@ async def _sweep(settings: Settings, *, only: str | None) -> int:
     from contract_intake.db.models import LLMCall
 
     names = sorted(p.stem for p in EXPECTED.glob("*.json"))
-    names = [n for n in names if (FIXTURES / f"{n}.pdf").exists()]
+    names = [n for n in names if (RENDERED / f"{n}.pdf").exists()]
     if only:
         names = [n for n in names if only in n]
 
@@ -313,7 +341,7 @@ async def _sweep(settings: Settings, *, only: str | None) -> int:
                 if not spec.get("fields"):
                     continue
                 document = load(
-                    FIXTURES / f"{name}.pdf",
+                    RENDERED / f"{name}.pdf",
                     settings=settings,
                     into=settings.data_dir / "eval" / name,
                 )

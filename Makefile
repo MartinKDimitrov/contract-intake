@@ -19,7 +19,7 @@ setup: .venv  ## Create venv and install the project with dev extras
 	$(PIP) install --quiet -e ".[dev]"
 	@echo "fetching the embedding model (~80MB, once)..."
 	@$(PY) -m contract_intake.cli knowledge --build >/dev/null
-	@$(PY) evals/fixtures/generate.py >/dev/null
+	@$(PY) evals/render.py >/dev/null
 	@echo "ready. copy .env.example to .env and fill in ANTHROPIC_API_KEY"
 
 .PHONY: test
@@ -58,7 +58,7 @@ costs:  ## Print the cost ledger summary
 	$(PY) -m contract_intake.cli costs
 
 .PHONY: triage
-triage:  ## Classify every fixture and corpus document (free)
+triage:  ## Classify every document, by provenance (free)
 	$(PY) evals/run.py --triage
 
 .PHONY: corpus

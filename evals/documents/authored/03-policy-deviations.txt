@@ -1,0 +1,27 @@
+SUPPLY AND SERVICES AGREEMENT
+
+Dated 2 April 2026 between Meridian Rail Holdings AD ("Customer") and
+Kestrel Analytics Ltd, company number 09912447, of 41 Fenchurch Street,
+London EC3M 4BS, United Kingdom ("Supplier").
+
+WHEREAS the Supplier shall provide data analytics services, the parties
+hereby agree as follows.
+
+1. TERM AND RENEWAL
+   The initial term is twelve (12) months from the date above. This
+   Agreement shall renew automatically for successive twelve (12) month
+   periods unless either party gives notice not less than ninety (90)
+   days prior to the end of the then-current term.
+
+2. PAYMENT TERMS
+   The Customer shall settle all invoices within ninety (90) days of the
+   invoice date.
+
+3. LIABILITY
+   Save for death or personal injury, neither party shall be liable to
+   the other for any loss whatsoever.
+
+4. GOVERNING LAW
+   This Agreement shall be governed by the laws of the Cayman Islands.
+
+Signed for and on behalf of the parties.
