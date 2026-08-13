@@ -8,7 +8,7 @@
   &middot; counterparty
   <span class="mono">{{ view.counterparty_id or 'unresolved' }}</span>
   {%- if view.counterparty_score %} ({{ '%.2f'|format(view.counterparty_score) }}){% endif %}
-  &middot; ${{ '%.4f'|format(view.usd) }} to process
+  &middot; <span class="num">${{ '%.4f'|format(view.usd) }}</span> to process
   &middot; <span class="tag">{{ view.item.state }}</span>
   {%- if view.redactions %}
   &middot; masked
@@ -43,7 +43,7 @@
         {% if f.value is none %}<span class="muted">not stated</span>
         {% else %}{{ f.value }}{% if f.currency %} {{ f.currency }}{% endif %}{% endif %}
       </td>
-      <td class="mono">{{ '%.2f'|format(f.confidence) }}</td>
+      <td class="num">{{ '%.2f'|format(f.confidence) }}</td>
       <td>
         {% if f.quote %}
           <span class="quote">&ldquo;{{ f.quote[:200] }}&rdquo;</span>

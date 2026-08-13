@@ -35,14 +35,28 @@
       font-size: 14px; line-height: 1.5; margin: 0; padding: 40px 24px 72px;
       -webkit-font-smoothing: antialiased;
     }
-    main, nav { max-width: 1100px; margin: 0 auto; }
+    main, header { max-width: 1100px; margin: 0 auto; }
 
-    nav { padding-bottom: 18px; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
-    nav a {
-      color: var(--muted); text-decoration: none; margin-right: 20px;
-      font-size: 11px; text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
+    /* Tabs, not links. Underlined text at this size reads as a footnote, and a
+       reviewer needs to know where they are before they read anything else. */
+    header {
+      display: flex; align-items: center; gap: 28px;
+      padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 36px;
     }
-    nav a:hover { color: var(--text-strong); }
+    header > b {
+      font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--text-strong);
+      letter-spacing: .04em;
+    }
+    header nav { display: flex; gap: 4px; }
+    header nav a {
+      text-decoration: none; padding: 6px 12px; border-radius: var(--radius);
+      font-size: 12px; font-weight: 500; letter-spacing: .02em;
+      color: var(--muted); border: 1px solid transparent;
+    }
+    header nav a:hover { color: var(--text-strong); background: var(--surface); }
+    header nav a.on {
+      color: #fff; background: var(--surface-raised); border-color: var(--border-strong);
+    }
 
     h1 {
       font-family: var(--mono); font-size: 22px; font-weight: 500; letter-spacing: -.01em;
@@ -56,6 +70,10 @@
     a { color: var(--accent); }
 
     .mono  { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    /* A figure the reader is meant to weigh -- a confidence, an amount, a count --
+       carries full contrast. Everything around it does not, which is what makes
+       it visible without any colour being spent on it. */
+    .num   { font-family: var(--mono); font-variant-numeric: tabular-nums; color: #fff; }
     .muted { color: var(--muted); }
     .quote { font-family: var(--mono); font-size: 12px; font-style: italic; color: var(--text); }
     .cite  {
@@ -149,8 +167,8 @@
     }
     .stats > div { background: var(--surface); padding: 16px 18px; }
     .stats b {
-      display: block; font-family: var(--mono); font-size: 24px; font-weight: 500;
-      color: var(--text-strong); letter-spacing: -.02em; font-variant-numeric: tabular-nums;
+      display: block; font-family: var(--mono); font-size: 26px; font-weight: 500;
+      color: #fff; letter-spacing: -.02em; font-variant-numeric: tabular-nums;
     }
     .stats span {
       display: block; margin-top: 4px; font-size: 11px; color: var(--muted);
@@ -163,9 +181,12 @@
 <body>
   <header>
     <b>contract intake</b>
-    <a href="/">queue</a>
-    <a href="/contracts">approved</a>
-    <a href="/costs">costs</a>
+    {% set here = request.url.path if request else '/' %}
+    <nav>
+      <a href="/"          class="{{ 'on' if here == '/' or here.startswith('/review') }}">Queue</a>
+      <a href="/contracts" class="{{ 'on' if here == '/contracts' }}">Approved</a>
+      <a href="/costs"     class="{{ 'on' if here == '/costs' }}">Costs</a>
+    </nav>
   </header>
   <main>{% block body %}{% endblock %}</main>
 </body>

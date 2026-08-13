@@ -4,7 +4,8 @@
 
 <h1>Cost ledger</h1>
 <p class="sub">
-  ${{ '%.4f'|format(costs.total_usd) }} over {{ costs.documents_delivered }} delivered
+  <span class="num">${{ '%.4f'|format(costs.total_usd) }}</span>
+  over <span class="num">{{ costs.documents_delivered }}</span> delivered
   document{{ '' if costs.documents_delivered == 1 else 's' }}
   &middot; ${{ '%.4f'|format(costs.usd_per_document) }} each
 </p>
@@ -19,7 +20,7 @@
     <tr>
       <td class="mono">{{ row.purpose }}</td>
       <td>{{ row.calls }}</td>
-      <td class="mono">${{ '%.4f'|format(row.usd) }}</td>
+      <td class="num">${{ '%.4f'|format(row.usd) }}</td>
       <td class="mono muted">{{ row.input_tokens }}</td>
       <td class="mono muted">{{ row.output_tokens }}</td>
       <td class="mono muted">{{ row.cache_read_tokens }}</td>

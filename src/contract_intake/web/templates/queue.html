@@ -41,7 +41,7 @@
       </td>
       <td class="mono">{{ row.counterparty }}</td>
       <td>{{ row.top_reason[:110] }}{% if row.top_reason|length > 110 %}&hellip;{% endif %}</td>
-      <td>{{ row.reason_count }}</td>
+      <td class="num">{{ row.reason_count }}</td>
       <td class="muted mono">{{ row.created_at.strftime('%d %b %H:%M') }}</td>
     </tr>
   {% endfor %}
