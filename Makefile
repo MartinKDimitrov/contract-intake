@@ -1,3 +1,5 @@
+# Overridable so CI can point at whatever interpreter the runner provides.
+PYTHON ?= python3.12
 PY := .venv/bin/python
 PIP := .venv/bin/pip
 
@@ -9,7 +11,7 @@ help:  ## Show this help
 		| awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
 .venv:
-	python3.12 -m venv .venv
+	$(PYTHON) -m venv .venv
 
 .PHONY: setup
 setup: .venv  ## Create venv and install the project with dev extras

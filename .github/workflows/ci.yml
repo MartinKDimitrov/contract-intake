@@ -1,0 +1,59 @@
+name: CI
+
+# The point of this workflow is not the badge. It is a clean-machine test of
+# `make setup`: the reviewer's first command is the one most likely to fail, and
+# a laptop with a warm pip cache proves nothing about a fresh checkout.
+#
+# It needs no secrets. The suite is hermetic -- no API key, no network calls to
+# Anthropic -- which is what makes "the tests pass" mean the same thing here as
+# it does locally.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          # Only the runner's own Python is cached here; the project installs
+          # into its own venv via `make setup`, exactly as a reviewer would.
+          cache: pip
+
+      # Chroma downloads an ONNX embedding model on first use. Cached so the
+      # 80MB fetch does not happen on every run.
+      - name: Cache the embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-v1
+
+      - name: make setup
+        run: make setup PYTHON=python
+
+      - name: make lint
+        run: make lint
+
+      - name: make test
+        run: make test
+
+      # The fixtures are generated, not committed as binaries, so the generator
+      # has to keep working. It is also what the eval harness runs on.
+      - name: Regenerate the fixtures
+        run: .venv/bin/python evals/fixtures/generate.py
+
+      - name: Check the pipeline chain is intact
+        run: .venv/bin/python -m contract_intake.cli stages

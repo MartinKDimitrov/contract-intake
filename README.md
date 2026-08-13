@@ -1,5 +1,7 @@
 # contract-intake
 
+[![CI](https://github.com/MartinKDimitrov/contract-intake/actions/workflows/ci.yml/badge.svg)](https://github.com/MartinKDimitrov/contract-intake/actions/workflows/ci.yml)
+
 An email with a vendor contract attached arrives. An agent reads it, extracts the
 commercial terms, checks them against the vendor registry and the internal
 contracting playbook, and routes the result: clean and on-policy contracts are
