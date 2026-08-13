@@ -143,7 +143,9 @@ async def test_budget_ceiling_blocks_before_spending(session, settings, attachme
             usd=settings.max_usd_per_document + 0.01,
         )
     )
-    session.flush()
+    # Committed, because the ledger is read on its own session now: a pending
+    # row in someone else's transaction is not money that has been recorded.
+    session.commit()
 
     fake = FakeAnthropic(FakeResponse(parsed_output=Answer(answer="x")))
     with pytest.raises(BudgetExceededError):

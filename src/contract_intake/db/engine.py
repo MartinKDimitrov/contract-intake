@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event, inspect
+from sqlalchemy import Engine, UniqueConstraint, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
 from contract_intake.config import Settings, get_settings
@@ -68,6 +68,30 @@ def assert_schema_current(engine: Engine) -> None:
         missing = sorted(c.name for c in table.columns if c.name not in on_disk)
         stale.extend(f"{name}.{column}" for column in missing)
 
+        # Columns are not the whole schema. `attachments.sha256` carries the
+        # deduplication guarantee in its *uniqueness*, and a database created
+        # before that constraint existed has the column, the index, and no
+        # uniqueness -- so the guard passed while duplicates were accepted.
+        unique_on_disk = {
+            tuple(index["column_names"])
+            for index in inspector.get_indexes(name)
+            if index.get("unique")
+        }
+        unique_on_disk |= {tuple(c["column_names"]) for c in inspector.get_unique_constraints(name)}
+        # Both shapes: `mapped_column(unique=True, index=True)` produces an
+        # Index, while `unique=True` alone produces a table-level
+        # UniqueConstraint and no Index at all -- which is how `contracts` and
+        # `review_items` keep their one-artefact-per-decision guarantee.
+        declared = {tuple(c.name for c in index.columns) for index in table.indexes if index.unique}
+        declared |= {
+            tuple(c.name for c in constraint.columns)
+            for constraint in table.constraints
+            if isinstance(constraint, UniqueConstraint)
+        }
+        for columns in sorted(declared):
+            if columns not in unique_on_disk:
+                stale.append(f"{name}.{'+'.join(columns)} (not unique)")
+
     if stale:
         raise StaleSchemaError(
             "database predates the current models -- missing "
@@ -96,6 +120,14 @@ def init_db(settings: Settings | None = None) -> Engine:
     _engine = build_engine(settings.database_url)
     Base.metadata.create_all(_engine)
     assert_schema_current(_engine)
+
+    # Fail here rather than per document. `load_checks` validates every operator
+    # in the playbook, and it is otherwise first called from inside stage 05 --
+    # so a typo in the JSON became three retries and a dead letter for every
+    # document that reached enrichment, instead of a process that will not start.
+    from contract_intake.policy.thresholds import load_checks
+
+    load_checks()
     _session_factory = sessionmaker(bind=_engine, expire_on_commit=False, future=True)
     return _engine
 
@@ -111,7 +143,8 @@ def session_scope() -> Iterator[Session]:
     """Transactional session. Commits on success, rolls back on any exception."""
     if _session_factory is None:
         init_db()
-    assert _session_factory is not None
+    if _session_factory is None:  # pragma: no cover - init_db always sets it
+        raise RuntimeError("the database is not initialised and init_db() did not set it up")
     session = _session_factory()
     try:
         yield session

@@ -6,15 +6,19 @@ import pytest
 from sqlalchemy.orm import Session, sessionmaker
 
 from contract_intake.config import Settings
-from contract_intake.db.engine import build_engine
-from contract_intake.db.models import Attachment, Base, Email
+from contract_intake.db.engine import get_engine, init_db
+from contract_intake.db.models import Attachment, Email
 from contract_intake.status import Status
 
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
+    # A file rather than ":memory:", because an in-memory SQLite database lives
+    # per connection: anything the code opens a *second* session on -- the cost
+    # ledger, a dead letter written after a rollback -- would silently address a
+    # different, empty database and the test would prove nothing.
     return Settings(
-        database_url="sqlite+pysqlite:///:memory:",
+        database_url=f"sqlite+pysqlite:///{tmp_path / 'test.db'}",
         data_dir=tmp_path / "var",
         model="claude-opus-5",
         max_usd_per_document=0.50,
@@ -23,9 +27,16 @@ def settings(tmp_path) -> Settings:
 
 @pytest.fixture
 def session(settings: Settings) -> Iterator[Session]:
-    engine = build_engine(settings.database_url)
-    Base.metadata.create_all(engine)
-    factory = sessionmaker(bind=engine, expire_on_commit=False, future=True)
+    """The test database, wired through init_db so tests take the real path.
+
+    Building an engine directly here used to bypass `init_db`, and with it the
+    schema guard -- which is exactly why a missing-column bug survived a green
+    suite. Going through init_db means the tests exercise the startup checks
+    too, and `session_scope()` inside the code under test addresses the same
+    database the fixture does.
+    """
+    init_db(settings)
+    factory = sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
     with factory() as s:
         yield s
 
@@ -55,5 +66,9 @@ def attachment(session: Session) -> Attachment:
         status=Status.RECEIVED,
     )
     session.add(att)
-    session.flush()
+    # Committed, not merely flushed: the cost ledger writes on its own session
+    # and a foreign key cannot see an uncommitted row. In the pipeline this is
+    # already true -- `drain` commits after every stage -- so a fixture that
+    # only flushes tests a state production never reaches.
+    session.commit()
     return att

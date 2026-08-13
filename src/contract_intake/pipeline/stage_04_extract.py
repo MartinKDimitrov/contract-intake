@@ -4,7 +4,8 @@ WHAT     Pull the commercial terms out of the document as structured data, with
          a confidence and a verbatim source quote attached to every field.
 IN       Status.LOADED
 OUT      Status.EXTRACTED
-TOKENS   LLM. One call, structured output, no tools, effort=high.
+TOKENS   LLM. One call, structured output, no tools, effort from settings
+         (medium by default -- see docs/COST_MODEL.md).
 FAILS    model refusal, truncation at max_tokens, schema validation failure,
          a quote that does not occur in the document, timeout, 429, budget.
 DEPENDS  extract/schema.py, extract/extractor.py, extract/prompts.py
@@ -97,7 +98,10 @@ class ExtractStage:
             Extraction(
                 document_id=row.id,
                 fields=outcome.to_json(),
-                model=ctx.settings.model,
+                # The model actually called, not the default: with a per-stage
+                # override set, these two differ and the row would disagree
+                # with its own ledger entry.
+                model=ctx.settings.model_for("extract"),
                 effort=ctx.settings.extract_effort,
             )
         )

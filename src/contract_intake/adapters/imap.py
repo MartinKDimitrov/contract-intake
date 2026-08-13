@@ -11,6 +11,7 @@ so a crash between fetch and commit re-delivers rather than silently drops.
 from __future__ import annotations
 
 import email
+import hashlib
 import imaplib
 import logging
 import socket
@@ -136,7 +137,13 @@ def parse_message(raw: bytes, *, source: str) -> InboundEmail:
     now = datetime.now(UTC)
 
     return InboundEmail(
-        message_id=(message.get("Message-ID") or "").strip() or f"<generated-{hash(raw)}>",
+        message_id=(
+            (message.get("Message-ID") or "").strip()
+            # hash() is salted per process, so the same message produced a
+            # different id on every restart and the dedup below never fired
+            # for exactly the messages that need it.
+            or f"<sha256-{hashlib.sha256(raw).hexdigest()[:32]}@generated>"
+        ),
         sender=parse_sender(message.get("From")),
         subject=decode_mime_header(message.get("Subject")),
         received_at=parse_date(message.get("Date"), fallback=now),

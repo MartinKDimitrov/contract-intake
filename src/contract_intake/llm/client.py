@@ -8,7 +8,8 @@ Two invariants, both deliberate:
    recording it. That is what makes docs/COST_MODEL.md measured rather than
    estimated.
 
-2. **Every call is budgeted.** A per-document ceiling is checked before the
+2. **Every call carrying an attachment id is budgeted.** A per-document
+   ceiling is checked before the
    request goes out. A runaway agent loop costs one stage, not one invoice.
 """
 
@@ -87,6 +88,19 @@ class LLMClient:
     ) -> None:
         self._settings = settings or get_settings()
         self._session = session
+        #: Every row written during the current stage, kept so that the runner
+        #: can re-emit them if the stage's transaction is rolled back.
+        #:
+        #: The ledger has to outlive the transaction that spent the money --
+        #: written only into the caller's session it is a pending row, and a
+        #: stage that fails at the database level takes the record of a paid
+        #: call with it. The obvious fix, committing each row on its own
+        #: connection, is worse: under WAL that advances the write-ahead log
+        #: while the caller holds a read snapshot, and SQLite then refuses to
+        #: let the caller write at all. It failed *every* document at stage 04,
+        #: immediately, with "database is locked" -- so durability is bought by
+        #: replaying these rows on the recovery path instead.
+        self.recorded: list[dict[str, Any]] = []
         self._client = client or anthropic.AsyncAnthropic(
             api_key=self._settings.anthropic_api_key.get_secret_value() or None
         )
@@ -194,6 +208,11 @@ class LLMClient:
         Usage is summed across every iteration and written as one ledger row, so
         an agent that took nine round trips reports what it actually cost rather
         than what its last message cost.
+
+        The budget is re-checked on every iteration, not only on entry. Checked
+        once, the ceiling bounds the call *after* the loop and never the loop
+        itself: twelve iterations at forty thousand input tokens each spend
+        several dollars against a fifty-cent ceiling without it noticing.
         """
         self._assert_within_budget(attachment_id)
         model = self._settings.model_for(purpose)
@@ -214,6 +233,7 @@ class LLMClient:
             kwargs["system"] = system
 
         started = time.perf_counter()
+        spent_before = self.spent_on(attachment_id)
         total = Usage()
         iterations = 0
         text = ""
@@ -224,6 +244,13 @@ class LLMClient:
                 iterations += 1
                 total = _add(total, _usage_from(message.usage))
                 text = _text_of(message) or text
+                spent_here = cost_usd(model, total)
+                if spent_before + spent_here >= self._settings.max_usd_per_document:
+                    raise BudgetExceededError(
+                        f"attachment {attachment_id} reached "
+                        f"${spent_before + spent_here:.4f} after {iterations} agent "
+                        f"iteration(s), ceiling is ${self._settings.max_usd_per_document:.2f}"
+                    )
                 if message.stop_reason == "refusal":
                     details = getattr(message, "stop_details", None)
                     raise RefusalError(
@@ -262,7 +289,7 @@ class LLMClient:
         )
 
     def spent_on(self, attachment_id: int | None) -> float:
-        """USD spent on one document so far."""
+        """USD spent on one document so far, read where the ledger is written."""
         if attachment_id is None:
             return 0.0
         stmt = select(func.coalesce(func.sum(LLMCall.usd), 0.0)).where(
@@ -293,23 +320,24 @@ class LLMClient:
         stop_reason: str | None = None,
         error: str | None = None,
     ) -> None:
-        self._session.add(
-            LLMCall(
-                attachment_id=attachment_id,
-                purpose=purpose,
-                model=model or self._settings.model,
-                effort=effort,
-                input_tokens=usage.input_tokens,
-                output_tokens=usage.output_tokens,
-                cache_read_tokens=usage.cache_read_tokens,
-                cache_write_tokens=usage.cache_write_tokens,
-                usd=cost_usd(model or self._settings.model, usage),
-                latency_ms=latency_ms,
-                stop_reason=stop_reason,
-                ok=ok,
-                error=error,
-            )
-        )
+        fields = {
+            "attachment_id": attachment_id,
+            "purpose": purpose,
+            "model": model or self._settings.model,
+            "effort": effort,
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cache_read_tokens": usage.cache_read_tokens,
+            "cache_write_tokens": usage.cache_write_tokens,
+            "usd": cost_usd(model or self._settings.model, usage),
+            "latency_ms": latency_ms,
+            "stop_reason": stop_reason,
+            "ok": ok,
+            "error": error,
+        }
+
+        self.recorded.append(fields)
+        self._session.add(LLMCall(**fields))
         self._session.flush()
 
 

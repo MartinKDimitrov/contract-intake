@@ -44,3 +44,19 @@ def test_a_missing_table_is_left_to_create_all(engine) -> None:
         connection.execute(text("DROP TABLE review_items"))
 
     assert_schema_current(engine)
+
+
+def test_losing_a_unique_constraint_is_drift_too(engine) -> None:
+    """Columns are not the whole schema.
+
+    `attachments.sha256` carries the deduplication guarantee in its uniqueness.
+    A database created before that constraint has the column, has the index, and
+    accepts duplicates -- and a guard that compares only column names certifies
+    it as current.
+    """
+    with engine.begin() as connection:
+        connection.execute(text("DROP INDEX ix_attachments_sha256"))
+        connection.execute(text("CREATE INDEX ix_attachments_sha256 ON attachments (sha256)"))
+
+    with pytest.raises(StaleSchemaError, match="not unique"):
+        assert_schema_current(engine)

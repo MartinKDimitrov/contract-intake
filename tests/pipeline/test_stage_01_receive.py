@@ -90,3 +90,52 @@ def test_odd_filenames_do_not_escape_the_storage_directory(session, settings) ->
 
     stored = Path(session.get(Attachment, created[0]).stored_path).resolve()
     assert stored.is_relative_to(settings.attachments_dir.resolve())
+
+
+async def test_one_bad_attachment_does_not_commit_half_an_email(session, settings, monkeypatch):
+    """A failure part way through must leave nothing, or redelivery is a no-op.
+
+    The batch used to be committed once at the end, so a failure on the second
+    of three attachments still committed the `emails` row and the attachments
+    written so far. The next poll then found the Message-ID already present,
+    returned nothing, and marked the message read -- so the rest of that email
+    was gone, with no row, no dead letter and nothing to grep for.
+    """
+    from sqlalchemy import func
+
+    from contract_intake.pipeline import stage_01_receive as intake
+
+    calls = {"n": 0}
+    real = intake._persist_attachment
+
+    def explode_on_the_second(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise OSError("disk full")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(intake, "_persist_attachment", explode_on_the_second)
+
+    class OneMessage:
+        """Records what it was told, so "not marked" is distinguishable from "not called"."""
+
+        def __init__(self) -> None:
+            self.seen: list[str] = []
+            self.mark_seen_calls = 0
+
+        def fetch_unseen(self, limit: int = 25):
+            return [("101", make_email(files=(("a.pdf", b"%PDF-1.7 a"), ("b.pdf", b"%PDF-1.7 b"))))]
+
+        def mark_seen(self, uids):
+            self.mark_seen_calls += 1
+            self.seen.extend(uids)
+
+    mailbox = OneMessage()
+    created = await intake.ImapSource(mailbox=mailbox).poll(session, settings)
+
+    session.rollback()
+    assert created == []
+    assert session.scalar(func.count(Email.id)) == 0, "no half-written email may survive"
+    assert session.scalar(func.count(Attachment.id)) == 0
+    assert mailbox.seen == [], "the message must stay unread so it is delivered again"
+    assert mailbox.mark_seen_calls == 1, "and the absence must be a call with nothing in it"

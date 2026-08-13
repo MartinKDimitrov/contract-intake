@@ -48,19 +48,47 @@ def test_every_non_terminal_status_has_exactly_one_consumer() -> None:
     assert len(consumed) == len(set(consumed)), "two stages claim the same status"
 
 
-def test_chain_gap_is_caught() -> None:
-    class Wrong:
-        number: ClassVar[int] = 3
-        name: ClassVar[str] = "wrong"
-        consumes: ClassVar[Status] = Status.EXTRACTED  # gap: nothing produces this yet
-        produces: ClassVar[Status] = Status.ENRICHED
-        uses_llm: ClassVar[bool] = False
+def _stage(number: int, consumes: Status, produces: Status):
+    """A minimal stage, for building deliberately broken chains."""
 
+    class Built:
         async def run(self, ctx: StageContext) -> StageOutcome:
             return Advanced()
 
-    with pytest.raises(BrokenPipelineError):
-        validate_chain((STAGES[0], Wrong()))  # type: ignore[arg-type]
+    Built.number, Built.name = number, f"s{number}"
+    Built.consumes, Built.produces, Built.uses_llm = consumes, produces, False
+    return Built()
+
+
+def test_chain_gap_is_caught() -> None:
+    """An interior seam that does not meet.
+
+    This test used to end the chain on a non-terminal status, so once the
+    terminal-status guard was added it raised on that instead -- green, and no
+    longer testing the gap it is named after. The chain below ends on
+    DELIVERED so that only the gap can fail it.
+    """
+    broken = (
+        _stage(2, Status.RECEIVED, Status.TRIAGED),
+        _stage(3, Status.EXTRACTED, Status.DELIVERED),  # gap: nothing produces EXTRACTED
+    )
+
+    with pytest.raises(BrokenPipelineError, match=r"produces .*triaged.* consumes .*extracted"):
+        validate_chain(broken)  # type: ignore[arg-type]
+
+
+def test_a_last_stage_that_is_not_terminal_is_caught() -> None:
+    """Otherwise documents cycle, with attempts reset to zero on every pass."""
+    with pytest.raises(BrokenPipelineError, match="not terminal"):
+        validate_chain((_stage(2, Status.RECEIVED, Status.TRIAGED),))  # type: ignore[arg-type]
+
+
+def test_a_source_that_feeds_nobody_is_caught(monkeypatch) -> None:
+    """Every new attachment would land where pick_next never looks."""
+    chain = (_stage(2, Status.LOADED, Status.DELIVERED),)
+
+    with pytest.raises(BrokenPipelineError, match="ImapSource produces"):
+        validate_chain(chain)  # type: ignore[arg-type]
 
 
 # -- driver behaviour -------------------------------------------------------
@@ -183,3 +211,109 @@ def test_stage_files_are_named_after_their_stage() -> None:
     for stage in STAGES:
         module = importlib.import_module(type(stage).__module__)
         assert module.__name__.split(".")[-1].startswith(f"stage_{stage.number:02d}_")
+
+
+async def test_a_backlog_finishes_documents_rather_than_advancing_all_of_them(
+    session, settings, monkeypatch
+) -> None:
+    """The queue must finish work in flight before starting more.
+
+    Ordered by `updated_at` alone, a batch moves in lockstep: every document
+    advances one stage before any advances two. A real poll of thirteen
+    documents spent its whole transition budget and delivered none of them,
+    leaving eleven paid for and unfinished.
+    """
+    from datetime import UTC, datetime
+
+    from contract_intake.db.models import Attachment, Email
+    from contract_intake.pipeline.runner import STAGES, drain
+
+    # Six stages that do nothing but advance, so the test is about ordering.
+    class Passthrough:
+        def __init__(self, real) -> None:
+            self.number, self.name = real.number, real.name
+            self.consumes, self.produces, self.uses_llm = real.consumes, real.produces, False
+
+        async def run(self, ctx: StageContext) -> StageOutcome:
+            return Advanced(note="ok")
+
+    chain = tuple(Passthrough(s) for s in STAGES)
+    monkeypatch.setattr(
+        "contract_intake.pipeline.runner.STAGE_BY_CONSUMES", {s.consumes: s for s in chain}
+    )
+
+    email = Email(
+        message_id="<batch@example.com>",
+        sender="a@b",
+        subject="batch",
+        received_at=datetime.now(UTC),
+    )
+    session.add(email)
+    session.flush()
+    for n in range(10):
+        session.add(
+            Attachment(
+                email_id=email.id,
+                filename=f"{n}.pdf",
+                sha256=f"{n:064d}",
+                declared_mime="application/pdf",
+                size_bytes=1,
+                stored_path=f"/tmp/{n}.pdf",
+                status=Status.RECEIVED,
+            )
+        )
+    session.commit()
+
+    # A budget that cannot carry all ten: 10 documents x 6 stages = 60.
+    result = await drain(session=session, settings=settings, max_transitions=20)
+
+    assert result.finished >= 3, (
+        f"only {result.finished} of 10 finished in {result.transitions} transitions; "
+        "the queue is advancing everything in lockstep again"
+    )
+
+
+async def test_a_drain_with_room_finishes_everything(session, settings, monkeypatch) -> None:
+    """The control: the ordering must not strand anything either."""
+    from datetime import UTC, datetime
+
+    from contract_intake.db.models import Attachment, Email
+    from contract_intake.pipeline.runner import STAGES, drain
+    from contract_intake.status import is_terminal
+
+    class Passthrough:
+        def __init__(self, real) -> None:
+            self.number, self.name = real.number, real.name
+            self.consumes, self.produces, self.uses_llm = real.consumes, real.produces, False
+
+        async def run(self, ctx: StageContext) -> StageOutcome:
+            return Advanced(note="ok")
+
+    chain = tuple(Passthrough(s) for s in STAGES)
+    monkeypatch.setattr(
+        "contract_intake.pipeline.runner.STAGE_BY_CONSUMES", {s.consumes: s for s in chain}
+    )
+
+    email = Email(
+        message_id="<all@example.com>", sender="a@b", subject="b", received_at=datetime.now(UTC)
+    )
+    session.add(email)
+    session.flush()
+    for n in range(5):
+        session.add(
+            Attachment(
+                email_id=email.id,
+                filename=f"{n}.pdf",
+                sha256=f"{n:064d}",
+                declared_mime="application/pdf",
+                size_bytes=1,
+                stored_path=f"/tmp/{n}.pdf",
+                status=Status.RECEIVED,
+            )
+        )
+    session.commit()
+
+    result = await drain(session=session, settings=settings)
+
+    assert result.finished == 5
+    assert all(is_terminal(Status(a.status)) for a in session.query(Attachment).all())

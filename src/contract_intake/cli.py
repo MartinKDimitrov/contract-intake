@@ -24,6 +24,7 @@ from contract_intake.knowledge.vendors import load_registry
 from contract_intake.llm.client import LLMClient
 from contract_intake.pipeline.runner import STAGE_BY_NUMBER, STAGES, advance, drain
 from contract_intake.pipeline.stage_01_receive import ImapSource
+from contract_intake.status import Status, is_terminal
 
 
 def _cmd_stage(args: argparse.Namespace) -> int:
@@ -37,6 +38,17 @@ def _cmd_stage(args: argparse.Namespace) -> int:
         attachment = session.get(Attachment, args.attachment_id)
         if attachment is None:
             print(f"no attachment {args.attachment_id}", file=sys.stderr)
+            return 2
+        # A settled document is settled. One mistyped id used to overwrite a
+        # REJECTED verdict -- with its explanation for the sender -- with DEAD
+        # plus a spurious dead letter, because replay checked nothing at all.
+        if is_terminal(Status(attachment.status)) and not args.force:
+            print(
+                f"attachment {args.attachment_id} is {attachment.status}: "
+                f"{attachment.status_reason or 'no reason recorded'}\n"
+                "replaying would discard that verdict; pass --force if you mean to",
+                file=sys.stderr,
+            )
             return 2
         attachment.status = stage.consumes
         attachment.attempts = 0
@@ -57,8 +69,8 @@ def _cmd_poll(args: argparse.Namespace) -> int:
         created = asyncio.run(source.poll(session, get_settings()))
         print(f"intake: {len(created)} new attachment(s) {created or ''}")
         if created and not args.intake_only:
-            moved = asyncio.run(drain(session=session, llm=LLMClient(session)))
-            print(f"pipeline: {moved} transition(s)")
+            result = asyncio.run(drain(session=session, llm=LLMClient(session)))
+            print(f"pipeline: {result}")
     return 0
 
 
@@ -70,8 +82,8 @@ def _cmd_mailbox(_args: argparse.Namespace) -> int:
 
 def _cmd_drain(_args: argparse.Namespace) -> int:
     with session_scope() as session:
-        moved = asyncio.run(drain(session=session, llm=LLMClient(session)))
-    print(f"{moved} transition(s)")
+        result = asyncio.run(drain(session=session, llm=LLMClient(session)))
+    print(result)
     return 0
 
 
@@ -183,6 +195,9 @@ def main() -> int:
 
     p_stage = sub.add_parser("stage", help="replay one pipeline phase")
     p_stage.add_argument("--number", type=int, required=True)
+    p_stage.add_argument(
+        "--force", action="store_true", help="replay even a rejected or dead document"
+    )
     p_stage.add_argument("--attachment-id", type=int, required=True)
     p_stage.set_defaults(func=_cmd_stage)
 

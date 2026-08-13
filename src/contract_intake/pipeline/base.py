@@ -36,7 +36,10 @@ class StageContext:
     session: Session
     settings: Settings
     llm: LLMClient | None = None
-    """None for the four zero-token stages (01, 02, 06, 07)."""
+    """None for the zero-token stages (02, 03, 06, 07).
+
+    Stage 01 is a Source and never receives a context at all.
+    """
 
 
 @dataclass(frozen=True, slots=True)

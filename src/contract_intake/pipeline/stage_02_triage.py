@@ -275,9 +275,6 @@ DISQUALIFYING_TERMS: tuple[str, ...] = (
     "vergabebekanntmachung",
 )
 
-#: How much of the document counts as its heading.
-HEADER_CHARS = 320
-
 #: A contract needs one instrument marker plus something else -- a lone
 #: "agreement" in a certificate's scope description is not enough.
 MIN_STRONG_HITS = 1
@@ -419,7 +416,8 @@ def _title(text: str) -> str:
     Disqualifiers used to be matched against the opening 320 characters, which
     is a paragraph rather than a title. A contract whose recitals name an
     annexed certificate of insurance was therefore turned away as a certificate,
-    and the docstring below anticipated exactly that case without preventing it.
+    and the note on DISQUALIFYING_TERMS anticipated exactly that case
+    without preventing it.
     """
     for line in text.splitlines():
         if line.strip():

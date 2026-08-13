@@ -5,7 +5,7 @@ IN       Status.DECIDED
 OUT      Status.DELIVERED
 TOKENS   0
 FAILS    write conflict, delivering the same decision twice.
-DEPENDS  store/, web/review.py
+DEPENDS  store/contracts.py
 
 AUTO_APPROVED  -> a row in ``contracts``: the clean, high-confidence record a
                   downstream system consumes.
@@ -14,8 +14,9 @@ NEEDS_REVIEW   -> a row in ``review_items``: the queue, carrying the extracted
                   agent's tool trace.
 REJECTED       -> recorded with its reason; no downstream artefact.
 
-Idempotent on ``decision_id`` -- replaying cannot produce a duplicate contract
-or a second review item.
+Idempotent on ``decision_id`` -- replaying *this* stage cannot produce a
+duplicate contract or a second review item. Replaying stage 06 mints a fresh
+decision, and that does duplicate; see docs/TESTING.md.
 """
 
 from __future__ import annotations
@@ -25,11 +26,12 @@ from typing import Any, ClassVar
 
 from sqlalchemy import select
 
-from contract_intake.db.models import Attachment, Contract, Enrichment, Extraction, ReviewItem
+from contract_intake.db.models import Attachment, Enrichment, Extraction, ReviewItem
 from contract_intake.db.models import Decision as DecisionRow
 from contract_intake.db.models import Document as DocumentRow
 from contract_intake.pipeline.base import Advanced, Failed, Rejected, StageContext, StageOutcome
 from contract_intake.status import Route, Status
+from contract_intake.store.contracts import record as store_contract
 
 log = logging.getLogger(__name__)
 
@@ -88,19 +90,12 @@ def _store_contract(
     extraction: Extraction,
     enrichment: Enrichment,
 ) -> int:
-    existing = ctx.session.scalar(select(Contract).where(Contract.decision_id == decision.id))
-    if existing is not None:
-        return existing.id
-
-    row = Contract(
+    return store_contract(
+        ctx.session,
         decision_id=decision.id,
+        fields=extraction.fields,
         counterparty_id=enrichment.counterparty_id,
-        counterparty_name=str(_value(extraction.fields, "counterparty_name") or ""),
-        payload=_clean_payload(extraction.fields),
     )
-    ctx.session.add(row)
-    ctx.session.flush()
-    return row.id
 
 
 def _open_review(ctx: StageContext, decision: DecisionRow) -> int:
@@ -117,16 +112,3 @@ def _open_review(ctx: StageContext, decision: DecisionRow) -> int:
 def _value(fields: dict[str, Any], name: str) -> Any:
     entry = fields.get(name)
     return entry.get("value") if isinstance(entry, dict) else None
-
-
-def _clean_payload(fields: dict[str, Any]) -> dict[str, Any]:
-    """Flatten to plain values for downstream consumers.
-
-    The provenance stays in ``extractions``; a system reading ``contracts`` wants
-    the terms, and anything that reached this table already passed every rule.
-    """
-    return {
-        name: (entry.get("value") if isinstance(entry, dict) else entry)
-        for name, entry in fields.items()
-        if not name.startswith("_")
-    }

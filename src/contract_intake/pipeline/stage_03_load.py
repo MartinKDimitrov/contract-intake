@@ -7,14 +7,14 @@ OUT      Status.LOADED
 TOKENS   0 -- but this stage determines most of stage 04's bill.
 FAILS    page that renders but yields no text and no image, pathological page
          count, embedded fonts that defeat text extraction, rasterisation OOM.
-DEPENDS  loaders/document.py, loaders/image.py, loaders/redact.py
+DEPENDS  loaders/document.py, which owns rendering and masking in turn
 
 This is the single biggest cost lever in the system, so it gets its own stage
 rather than hiding inside extraction:
 
-  * A 20-page contract sent as text is roughly 15k tokens. The same contract
-    sent as page images is roughly 20 x 3.7k = 74k tokens at the default
-    resolution -- about 5x more.
+  * A 20-page contract sent as text is roughly 5k tokens. The same contract
+    sent as page images is roughly 20 x 1,850 = 37k tokens at the default
+    resolution -- about 7.4x more.
   * The decision is per page. A born-digital contract with one scanned
     signature page sends 19 pages of text and exactly one image.
   * Image pages are downsampled to the smallest size at which the model still

@@ -64,7 +64,9 @@ class Attachment(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     email_id: Mapped[int] = mapped_column(ForeignKey("emails.id"), index=True)
     filename: Mapped[str] = mapped_column(String(512))
-    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    #: Unique, not merely indexed. The dedup in stage 01 is a read-then-write,
+    #: so without a constraint two pollers both see "not seen" and both insert.
+    sha256: Mapped[str] = mapped_column(String(64), index=True, unique=True)
     declared_mime: Mapped[str] = mapped_column(String(128), default="")
     detected_mime: Mapped[str] = mapped_column(String(128), default="")
     size_bytes: Mapped[int] = mapped_column(Integer)

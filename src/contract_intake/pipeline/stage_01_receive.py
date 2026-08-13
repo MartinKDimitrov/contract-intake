@@ -53,15 +53,24 @@ class ImapSource:
         created: list[int] = []
         handled: list[str] = []
         for uid, inbound in fetched:
+            # One transaction per message. Committing the batch at the end meant
+            # a failure on the second of three attachments still committed the
+            # `emails` row and the attachments written so far -- and the redelivery
+            # this promises was then swallowed by the Message-ID dedup, which saw
+            # the message as already handled. The rest of that email was lost with
+            # no row, no dead letter and nothing to grep for.
             try:
                 created.extend(ingest_email(inbound, session=session, settings=settings))
+                session.commit()
             except Exception:
-                # Leave the message unread so the next poll retries it.
+                session.rollback()
+                # Left unread, and now genuinely re-ingestable: nothing about it
+                # was committed, so the dedup will not turn the retry into a
+                # silent no-op.
                 log.exception("failed to ingest %s; leaving unread", inbound.message_id)
                 continue
             handled.append(uid)
 
-        session.commit()
         mailbox.mark_seen(handled)
         return created
 
@@ -85,8 +94,18 @@ class WebhookSource:
     async def poll(self, session: Session, settings: Settings) -> Sequence[int]:
         created: list[int] = []
         while self._pending:
-            created.extend(ingest_email(self._pending.pop(0), session=session, settings=settings))
-        session.commit()
+            # Read, ingest, commit, *then* drop. Popping first meant a raise
+            # discarded the payload with no retry and no trace -- and a webhook
+            # provider will not deliver it twice.
+            inbound = self._pending[0]
+            try:
+                created.extend(ingest_email(inbound, session=session, settings=settings))
+                session.commit()
+            except Exception:
+                session.rollback()
+                log.exception("failed to ingest %s; leaving queued", inbound.message_id)
+                raise
+            self._pending.pop(0)
         return created
 
 
