@@ -25,14 +25,14 @@
       --bad:           #8b4a4a;  --bad-bg:    #211414;  --bad-border:    #4a2a2a;
       --radius: 4px;
       --ui:    "Inter", "SF Pro Text", system-ui, -apple-system, sans-serif;
-      --prose: Georgia, "Times New Roman", serif;
+      --prose: "Inter", "SF Pro Text", system-ui, -apple-system, sans-serif;
       --mono:  ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
     }
 
     * { box-sizing: border-box; }
     body {
       background: var(--bg); color: var(--text); font-family: var(--ui);
-      font-size: 14px; line-height: 1.5; margin: 0; padding: 40px 24px 72px;
+      font-size: 14px; line-height: 1.55; margin: 0; padding: 40px 24px 72px;
       -webkit-font-smoothing: antialiased;
     }
     main, header { max-width: 1100px; margin: 0 auto; }
@@ -157,7 +157,7 @@
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       padding: 16px 18px; border-top: 1px solid var(--border);
     }
-    .panel > .actions .muted { font-family: var(--prose); font-style: italic; }
+    .panel > .actions .muted { font-family: var(--prose); }
     .panel table { border: none; border-radius: 0; }
 
     /* One heading per thing that is wrong, with the specific problems under it. */

@@ -81,21 +81,9 @@
 </table>
 
 {% if view.notes %}
-  <h2>Extractor notes</h2>
-  <div class="card muted">{{ view.notes }}</div>
+  <h2>What the model wanted to add</h2>
+  <div class="card">{{ view.notes }}</div>
 {% endif %}
-
-<h2>Findings</h2>
-{% for f in view.findings %}
-  <div class="card">
-    <span class="tag {{ f.severity }}">{{ f.severity }}</span>
-    <span class="cite mono">{{ f.citation }}</span>
-    <span class="mono muted">{{ f.field }}</span>
-    <div style="margin-top:6px">{{ f.explanation }}</div>
-  </div>
-{% else %}
-  <p class="muted">The agent recorded nothing.</p>
-{% endfor %}
 
 <h2>What the agent looked up</h2>
 <div class="panel">

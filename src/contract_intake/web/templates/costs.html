@@ -7,7 +7,9 @@
   <span class="num">${{ '%.4f'|format(costs.total_usd) }}</span>
   over <span class="num">{{ costs.documents_delivered }}</span> delivered
   document{{ '' if costs.documents_delivered == 1 else 's' }}
-  &middot; ${{ '%.4f'|format(costs.usd_per_document) }} each
+  {%- if costs.usd_per_document %}
+  &middot; <span class="num">${{ '%.4f'|format(costs.usd_per_document) }}</span> each
+  {%- endif %}
 </p>
 
 <h2>By stage</h2>
