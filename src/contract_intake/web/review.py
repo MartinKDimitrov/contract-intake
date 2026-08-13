@@ -113,7 +113,11 @@ class ItemView:
         order: list[str] = []
 
         for reason in self.reasons:
-            fields = [f for f in reason.get("fields", ()) if f] or ["_document"]
+            named = [f for f in reason.get("fields", ()) if f]
+            # A reason that names most of the record is about the record, not
+            # about each field in it. Fanning it out produced one card per field,
+            # each repeating the same list of nine -- nine ways to say one thing.
+            fields = named if 0 < len(named) <= 2 else ["_document"]
             for name in fields:
                 if name not in by_field:
                     by_field[name] = {

@@ -323,8 +323,9 @@ def rule_partially_unverifiable(ev: Evidence, _s: Settings) -> list[Reason]:
         Reason(
             rule="partially_unverifiable",
             message=(
-                f"{len(unchecked)} value(s) a decision rests on could not be checked "
-                f"against a text layer: {', '.join(unchecked)}"
+                f"{len(unchecked)} of the values this decision rests on came from a page "
+                "with no text layer, so no quote could be checked against the document. "
+                "They are marked 'scan' in the table below."
             ),
             fields=tuple(unchecked),
         )
