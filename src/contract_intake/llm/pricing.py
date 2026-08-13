@@ -16,9 +16,11 @@ CACHE_READ_MULTIPLIER = 0.10
 
 @dataclass(frozen=True, slots=True)
 class ModelRates:
-    input_per_mtok: float
-    output_per_mtok: float
-    adaptive_thinking: bool = True
+    # fmt: off
+    input_per_mtok    : float
+    output_per_mtok   : float
+    adaptive_thinking : bool = True
+    # fmt: on
     """Whether the model accepts `thinking: {type: "adaptive"}` and `effort`.
 
     These arrived with the 4.6 generation. Sending either to an older model is a
@@ -60,10 +62,12 @@ def rates_for(model: str) -> ModelRates:
 class Usage:
     """Token usage for one call, split by billing category."""
 
-    input_tokens: int = 0
-    output_tokens: int = 0
-    cache_read_tokens: int = 0
-    cache_write_tokens: int = 0
+    # fmt: off
+    input_tokens       : int = 0
+    output_tokens      : int = 0
+    cache_read_tokens  : int = 0
+    cache_write_tokens : int = 0
+    # fmt: on
 
     @property
     def total_input(self) -> int:

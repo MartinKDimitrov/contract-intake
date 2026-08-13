@@ -38,12 +38,14 @@ CHARS_PER_TOKEN = 3.7
 
 @dataclass(frozen=True, slots=True)
 class Page:
-    number: int
-    kind: PageKind
-    text: str = ""
-    image_path: str = ""
-    width: int = 0
-    height: int = 0
+    # fmt: off
+    number     : int
+    kind       : PageKind
+    text       : str = ""
+    image_path : str = ""
+    width      : int = 0
+    height     : int = 0
+    # fmt: on
 
     @property
     def estimated_tokens(self) -> int:

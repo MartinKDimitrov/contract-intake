@@ -30,9 +30,11 @@ COLLECTION = "policy"
 
 @dataclass(frozen=True, slots=True)
 class Clause:
-    section: str
-    title: str
-    body: str
+    # fmt: off
+    section : str
+    title   : str
+    body    : str
+    # fmt: on
 
     @property
     def citation(self) -> str:

@@ -32,10 +32,12 @@ class StageContext:
     a test can drive any phase with an in-memory database and a fake LLM.
     """
 
-    attachment_id: int
-    session: Session
-    settings: Settings
-    llm: LLMClient | None = None
+    # fmt: off
+    attachment_id : int
+    session       : Session
+    settings      : Settings
+    llm           : LLMClient | None = None
+    # fmt: on
     """None for the zero-token stages (02, 03, 06, 07).
 
     Stage 01 is a Source and never receives a context at all.
@@ -64,9 +66,11 @@ class Rejected:
 class Failed:
     """Something went wrong. ``retryable`` decides retry vs dead letter."""
 
-    error: Exception
-    retryable: bool = True
-    note: str = ""
+    # fmt: off
+    error     : Exception
+    retryable : bool = True
+    note      : str  = ""
+    # fmt: on
 
 
 StageOutcome = Advanced | Rejected | Failed
@@ -76,11 +80,13 @@ StageOutcome = Advanced | Rejected | Failed
 class Stage(Protocol):
     """A single phase. One file per implementation, in stage order."""
 
-    number: ClassVar[int]
-    name: ClassVar[str]
-    consumes: ClassVar[Status]
-    produces: ClassVar[Status]
-    uses_llm: ClassVar[bool]
+    # fmt: off
+    number   : ClassVar[int]
+    name     : ClassVar[str]
+    consumes : ClassVar[Status]
+    produces : ClassVar[Status]
+    uses_llm : ClassVar[bool]
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome: ...
 

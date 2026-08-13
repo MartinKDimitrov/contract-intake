@@ -55,11 +55,13 @@ log = logging.getLogger(__name__)
 
 
 class EnrichStage:
-    number: ClassVar[int] = 5
-    name: ClassVar[str] = "enrich"
-    consumes: ClassVar[Status] = Status.EXTRACTED
-    produces: ClassVar[Status] = Status.ENRICHED
-    uses_llm: ClassVar[bool] = True
+    # fmt: off
+    number   : ClassVar[int]    = 5
+    name     : ClassVar[str]    = "enrich"
+    consumes : ClassVar[Status] = Status.EXTRACTED
+    produces : ClassVar[Status] = Status.ENRICHED
+    uses_llm : ClassVar[bool]   = True
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome:
         attachment = ctx.session.get(Attachment, ctx.attachment_id)

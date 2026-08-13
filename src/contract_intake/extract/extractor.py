@@ -33,18 +33,22 @@ MIN_VERIFIABLE_QUOTE_CHARS = 12
 
 @dataclass(frozen=True, slots=True)
 class FieldVerdict:
-    name: str
-    status: str  # verified | unverifiable | not_found | absent
-    confidence: float
-    note: str = ""
+    # fmt: off
+    name       : str
+    status     : str       # verified | unverifiable | not_found | absent
+    confidence : float
+    note       : str = ""
+    # fmt: on
 
 
 @dataclass(slots=True)
 class ExtractionOutcome:
-    extraction: ContractExtraction
-    verdicts: list[FieldVerdict] = field(default_factory=list)
-    usd: float = 0.0
-    latency_ms: int = 0
+    # fmt: off
+    extraction : ContractExtraction
+    verdicts   : list[FieldVerdict] = field(default_factory=list)
+    usd        : float              = 0.0
+    latency_ms : int                = 0
+    # fmt: on
 
     @property
     def hallucinated(self) -> list[str]:

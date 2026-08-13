@@ -27,10 +27,12 @@ class Settings(BaseSettings):
     )
 
     # --- LLM ---------------------------------------------------------------
-    anthropic_api_key: SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
-    model: str = "claude-opus-5"
-    extract_model: str = ""
-    enrich_model: str = ""
+    # fmt: off
+    anthropic_api_key : SecretStr = Field(default=SecretStr(""), alias="ANTHROPIC_API_KEY")
+    model             : str       = "claude-opus-5"
+    extract_model     : str       = ""
+    enrich_model      : str       = ""
+    # fmt: on
     """Per-stage model overrides; empty means fall back to `model`.
 
     The two stages do work of very different difficulty. Extraction reads
@@ -39,9 +41,11 @@ class Settings(BaseSettings):
     thresholds. Paying the same rate for both is a choice, not a requirement.
     """
 
-    extract_effort: Effort = "medium"
-    enrich_effort: Effort = "medium"
-    max_usd_per_document: float = 0.75
+    # fmt: off
+    extract_effort       : Effort = "medium"
+    enrich_effort        : Effort = "medium"
+    max_usd_per_document : float  = 0.75
+    # fmt: on
 
     #: Mask personal data out of page text before it reaches a model or the
     #: database. On by default: a contract carries identifiers that the fields
@@ -50,21 +54,25 @@ class Settings(BaseSettings):
     redact_personal_data: bool = True
 
     # --- Email intake ------------------------------------------------------
-    imap_host: str = "imap.gmail.com"
-    imap_port: int = 993
-    imap_user: str = ""
-    imap_password: SecretStr = SecretStr("")
-    imap_folder: str = "INBOX"
-    imap_poll_seconds: int = 15
+    # fmt: off
+    imap_host         : str       = "imap.gmail.com"
+    imap_port         : int       = 993
+    imap_user         : str       = ""
+    imap_password     : SecretStr = SecretStr("")
+    imap_folder       : str       = "INBOX"
+    imap_poll_seconds : int       = 15
+    # fmt: on
 
     # --- Storage -----------------------------------------------------------
     data_dir: Path = Path("var")
     database_url: str = "sqlite+pysqlite:///var/contract_intake.db"
 
     # --- Behaviour ---------------------------------------------------------
-    min_field_confidence: float = 0.80
-    min_vendor_match: float = 0.85
-    max_attachment_mb: int = 25
+    # fmt: off
+    min_field_confidence : float = 0.80
+    min_vendor_match     : float = 0.85
+    max_attachment_mb    : int   = 25
+    # fmt: on
 
     # --- Cost levers (stage 03) --------------------------------------------
     page_image_max_px: int = 1400

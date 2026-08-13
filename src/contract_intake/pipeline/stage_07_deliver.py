@@ -37,11 +37,13 @@ log = logging.getLogger(__name__)
 
 
 class DeliverStage:
-    number: ClassVar[int] = 7
-    name: ClassVar[str] = "deliver"
-    consumes: ClassVar[Status] = Status.DECIDED
-    produces: ClassVar[Status] = Status.DELIVERED
-    uses_llm: ClassVar[bool] = False
+    # fmt: off
+    number   : ClassVar[int]    = 7
+    name     : ClassVar[str]    = "deliver"
+    consumes : ClassVar[Status] = Status.DECIDED
+    produces : ClassVar[Status] = Status.DELIVERED
+    uses_llm : ClassVar[bool]   = False
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome:
         attachment = ctx.session.get(Attachment, ctx.attachment_id)

@@ -75,13 +75,15 @@ When you have nothing further to support, stop and say so in one line.\
 
 @dataclass(slots=True)
 class AgentOutcome:
-    findings: list[Finding]
-    trace: list[dict[str, Any]]
-    counterparty_id: str | None
-    counterparty_score: float | None
-    summary: str
-    usd: float
-    iterations: int
+    # fmt: off
+    findings           : list[Finding]
+    trace              : list[dict[str, Any]]
+    counterparty_id    : str | None
+    counterparty_score : float | None
+    summary            : str
+    usd                : float
+    iterations         : int
+    # fmt: on
 
     @property
     def used_knowledge_base(self) -> bool:

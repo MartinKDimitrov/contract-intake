@@ -60,21 +60,25 @@ class TruncatedError(LLMError):
 class AgentRun:
     """The result of a bounded tool-use loop."""
 
-    text: str
-    usage: Usage
-    usd: float
-    latency_ms: int
-    iterations: int
+    # fmt: off
+    text       : str
+    usage      : Usage
+    usd        : float
+    latency_ms : int
+    iterations : int
+    # fmt: on
 
 
 @dataclass(frozen=True, slots=True)
 class LLMResult[TValue]:
-    value: TValue
-    usage: Usage
-    usd: float
-    latency_ms: int
-    model: str
-    stop_reason: str | None
+    # fmt: off
+    value       : TValue
+    usage       : Usage
+    usd         : float
+    latency_ms  : int
+    model       : str
+    stop_reason : str | None
+    # fmt: on
 
 
 class LLMClient:

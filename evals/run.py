@@ -51,23 +51,27 @@ based it on.\
 
 @dataclass
 class FieldResult:
-    name: str
-    expected: Any
-    actual: Any
-    correct: bool
-    provenance: str
+    # fmt: off
+    name       : str
+    expected   : Any
+    actual     : Any
+    correct    : bool
+    provenance : str
+    # fmt: on
 
 
 @dataclass
 class DocResult:
-    name: str
-    fields: list[FieldResult] = field(default_factory=list)
-    with_kb: set[str] = field(default_factory=set)
-    without_kb: set[str] = field(default_factory=set)
-    expected_deviations: set[str] = field(default_factory=set)
-    counterparty: str | None = None
-    expected_counterparty: str | None = None
-    usd: float = 0.0
+    # fmt: off
+    name                  : str
+    fields                : list[FieldResult] = field(default_factory=list)
+    with_kb               : set[str]          = field(default_factory=set)
+    without_kb            : set[str]          = field(default_factory=set)
+    expected_deviations   : set[str]          = field(default_factory=set)
+    counterparty          : str | None        = None
+    expected_counterparty : str | None        = None
+    usd                   : float             = 0.0
+    # fmt: on
 
     @property
     def accuracy(self) -> float:

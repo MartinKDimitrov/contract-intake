@@ -35,11 +35,13 @@ Severity = Literal["low", "medium", "high"]
 
 @dataclass(frozen=True, slots=True)
 class Finding:
-    kind: FindingKind
-    severity: Severity
-    field_name: str
-    citation: str
-    explanation: str
+    # fmt: off
+    kind        : FindingKind
+    severity    : Severity
+    field_name  : str
+    citation    : str
+    explanation : str
+    # fmt: on
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -55,11 +57,13 @@ class Finding:
 class ToolBox:
     """Holds the agent's dependencies, its findings and its trace."""
 
-    settings: Settings
-    findings: list[Finding] = field(default_factory=list)
-    trace: list[dict[str, Any]] = field(default_factory=list)
-    counterparty_id: str | None = None
-    counterparty_score: float | None = None
+    # fmt: off
+    settings           : Settings
+    findings           : list[Finding]        = field(default_factory=list)
+    trace              : list[dict[str, Any]] = field(default_factory=list)
+    counterparty_id    : str | None           = None
+    counterparty_score : float | None         = None
+    # fmt: on
 
     def _record(self, tool: str, request: dict[str, Any], response: Any) -> None:
         self.trace.append({"tool": tool, "input": request, "output": response})
@@ -174,10 +178,12 @@ class ToolBox:
             resolve the counterparty first.
 
             Args:
-                kind: policy_deviation, counterparty, or data_quality.
-                severity: low, medium or high.
-                field_name: The extracted field this concerns, or "document".
-                citation: The playbook section (e.g. "S4.1") or vendor id
+                # fmt: off
+                kind       : policy_deviation, counterparty, or data_quality.
+                severity   : low, medium or high.
+                field_name : The extracted field this concerns, or "document".
+                citation   : The playbook section (e.g. "S4.1") or vendor id
+                # fmt: on
                     (e.g. "VEN-0142") this rests on.
                 explanation: One or two sentences a reviewer can act on.
             """

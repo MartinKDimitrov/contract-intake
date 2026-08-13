@@ -80,15 +80,17 @@ LEGAL_FORMS: frozenset[str] = frozenset(
 
 @dataclass(frozen=True, slots=True)
 class Vendor:
-    id: str
-    legal_name: str
-    aliases: tuple[str, ...]
-    registration_id: str
-    country: str
-    category: str
-    risk_class: str
-    status: str
-    notes: str = ""
+    # fmt: off
+    id              : str
+    legal_name      : str
+    aliases         : tuple[str, ...]
+    registration_id : str
+    country         : str
+    category        : str
+    risk_class      : str
+    status          : str
+    notes           : str = ""
+    # fmt: on
 
     @property
     def is_suspended(self) -> bool:
@@ -97,11 +99,13 @@ class Vendor:
 
 @dataclass(frozen=True, slots=True)
 class Match:
-    vendor: Vendor | None
-    score: float
-    matched_on: str
-    reason: str
-    runners_up: tuple[tuple[str, float], ...] = ()
+    # fmt: off
+    vendor     : Vendor | None
+    score      : float
+    matched_on : str
+    reason     : str
+    runners_up : tuple[tuple[str, float], ...] = ()
+    # fmt: on
 
     @property
     def resolved(self) -> bool:

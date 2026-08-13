@@ -31,11 +31,13 @@ RULES_VERSION = 1
 class Reason:
     """One rule firing, with the evidence that made it fire."""
 
-    rule: str
-    message: str
-    citation: str = ""
-    fields: tuple[str, ...] = ()
-    blocking: bool = True
+    # fmt: off
+    rule     : str
+    message  : str
+    citation : str             = ""
+    fields   : tuple[str, ...] = ()
+    blocking : bool            = True
+    # fmt: on
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -49,9 +51,11 @@ class Reason:
 
 @dataclass(frozen=True, slots=True)
 class Decision:
-    route: Route
-    reasons: tuple[Reason, ...]
-    blocking_fields: tuple[str, ...]
+    # fmt: off
+    route           : Route
+    reasons         : tuple[Reason, ...]
+    blocking_fields : tuple[str, ...]
+    # fmt: on
 
     @property
     def auto_approved(self) -> bool:
@@ -62,11 +66,13 @@ class Decision:
 class Evidence:
     """Everything the rules are allowed to see."""
 
-    extraction: dict[str, Any]
-    findings: Sequence[dict[str, Any]] = ()
-    counterparty_id: str | None = None
-    counterparty_score: float | None = None
-    counterparty_status: str = "unknown"
+    # fmt: off
+    extraction          : dict[str, Any]
+    findings            : Sequence[dict[str, Any]] = ()
+    counterparty_id     : str | None               = None
+    counterparty_score  : float | None             = None
+    counterparty_status : str                      = "unknown"
+    # fmt: on
 
     def field(self, name: str) -> dict[str, Any]:
         value = self.extraction.get(name)

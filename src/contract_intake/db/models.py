@@ -61,16 +61,20 @@ class Attachment(Base):
 
     __tablename__ = "attachments"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email_id: Mapped[int] = mapped_column(ForeignKey("emails.id"), index=True)
-    filename: Mapped[str] = mapped_column(String(512))
+    # fmt: off
+    id       : Mapped[int] = mapped_column(primary_key=True)
+    email_id : Mapped[int] = mapped_column(ForeignKey("emails.id"), index=True)
+    filename : Mapped[str] = mapped_column(String(512))
+    # fmt: on
     #: Unique, not merely indexed. The dedup in stage 01 is a read-then-write,
     #: so without a constraint two pollers both see "not seen" and both insert.
-    sha256: Mapped[str] = mapped_column(String(64), index=True, unique=True)
-    declared_mime: Mapped[str] = mapped_column(String(128), default="")
-    detected_mime: Mapped[str] = mapped_column(String(128), default="")
-    size_bytes: Mapped[int] = mapped_column(Integer)
-    stored_path: Mapped[str] = mapped_column(String(1024))
+    # fmt: off
+    sha256        : Mapped[str] = mapped_column(String(64), index=True, unique=True)
+    declared_mime : Mapped[str] = mapped_column(String(128), default="")
+    detected_mime : Mapped[str] = mapped_column(String(128), default="")
+    size_bytes    : Mapped[int] = mapped_column(Integer)
+    stored_path   : Mapped[str] = mapped_column(String(1024))
+    # fmt: on
 
     status: Mapped[Status] = mapped_column(String(16), default=Status.RECEIVED, index=True)
     status_reason: Mapped[str | None] = mapped_column(Text, default=None)
@@ -96,12 +100,14 @@ class Document(Base):
 
     __tablename__ = "documents"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    attachment_id: Mapped[int] = mapped_column(ForeignKey("attachments.id"), index=True)
-    page_count: Mapped[int] = mapped_column(Integer)
-    text_pages: Mapped[int] = mapped_column(Integer, default=0)
-    image_pages: Mapped[int] = mapped_column(Integer, default=0)
-    pages: Mapped[list[Any]] = mapped_column(default=list)
+    # fmt: off
+    id            : Mapped[int]       = mapped_column(primary_key=True)
+    attachment_id : Mapped[int]       = mapped_column(ForeignKey("attachments.id"), index=True)
+    page_count    : Mapped[int]       = mapped_column(Integer)
+    text_pages    : Mapped[int]       = mapped_column(Integer, default=0)
+    image_pages   : Mapped[int]       = mapped_column(Integer, default=0)
+    pages         : Mapped[list[Any]] = mapped_column(default=list)
+    # fmt: on
     #: Masked items by category, or NULL when masking did not run. The
     #: distinction matters: an empty dict means the document was clean, NULL
     #: means nothing looked.
@@ -114,13 +120,15 @@ class Extraction(Base):
 
     __tablename__ = "extractions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
-    schema_version: Mapped[int] = mapped_column(Integer, default=SCHEMA_VERSION)
-    fields: Mapped[dict[str, Any]] = mapped_column(default=dict)
-    model: Mapped[str] = mapped_column(String(64))
-    effort: Mapped[str] = mapped_column(String(16))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: off
+    id             : Mapped[int]            = mapped_column(primary_key=True)
+    document_id    : Mapped[int]            = mapped_column(ForeignKey("documents.id"), index=True)
+    schema_version : Mapped[int]            = mapped_column(Integer, default=SCHEMA_VERSION)
+    fields         : Mapped[dict[str, Any]] = mapped_column(default=dict)
+    model          : Mapped[str]            = mapped_column(String(64))
+    effort         : Mapped[str]            = mapped_column(String(16))
+    created_at     : Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: on
 
 
 class Enrichment(Base):
@@ -147,13 +155,15 @@ class Decision(Base):
 
     __tablename__ = "decisions"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    enrichment_id: Mapped[int] = mapped_column(ForeignKey("enrichments.id"), index=True)
-    route: Mapped[Route] = mapped_column(String(16), index=True)
-    reasons: Mapped[list[Any]] = mapped_column(default=list)
-    blocking_fields: Mapped[list[Any]] = mapped_column(default=list)
-    rules_version: Mapped[int] = mapped_column(Integer, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: off
+    id              : Mapped[int]       = mapped_column(primary_key=True)
+    enrichment_id   : Mapped[int]       = mapped_column(ForeignKey("enrichments.id"), index=True)
+    route           : Mapped[Route]     = mapped_column(String(16), index=True)
+    reasons         : Mapped[list[Any]] = mapped_column(default=list)
+    blocking_fields : Mapped[list[Any]] = mapped_column(default=list)
+    rules_version   : Mapped[int]       = mapped_column(Integer, default=1)
+    created_at      : Mapped[datetime]  = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: on
 
 
 class Contract(Base):
@@ -192,14 +202,18 @@ class LLMCall(Base):
     attachment_id: Mapped[int | None] = mapped_column(
         ForeignKey("attachments.id"), default=None, index=True
     )
-    purpose: Mapped[str] = mapped_column(String(64), index=True)
-    model: Mapped[str] = mapped_column(String(64))
-    effort: Mapped[str] = mapped_column(String(16), default="")
+    # fmt: off
+    purpose : Mapped[str] = mapped_column(String(64), index=True)
+    model   : Mapped[str] = mapped_column(String(64))
+    effort  : Mapped[str] = mapped_column(String(16), default="")
+    # fmt: on
 
-    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    cache_write_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    # fmt: off
+    input_tokens       : Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens      : Mapped[int] = mapped_column(Integer, default=0)
+    cache_read_tokens  : Mapped[int] = mapped_column(Integer, default=0)
+    cache_write_tokens : Mapped[int] = mapped_column(Integer, default=0)
+    # fmt: on
 
     usd: Mapped[float] = mapped_column(Float, default=0.0)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
@@ -214,11 +228,13 @@ class DeadLetter(Base):
 
     __tablename__ = "dead_letters"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    attachment_id: Mapped[int] = mapped_column(ForeignKey("attachments.id"), index=True)
-    stage: Mapped[str] = mapped_column(String(32))
-    error_class: Mapped[str] = mapped_column(String(128))
-    message: Mapped[str] = mapped_column(Text, default="")
-    payload: Mapped[dict[str, Any]] = mapped_column(default=dict)
-    attempts: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: off
+    id            : Mapped[int]            = mapped_column(primary_key=True)
+    attachment_id : Mapped[int]            = mapped_column(ForeignKey("attachments.id"), index=True)
+    stage         : Mapped[str]            = mapped_column(String(32))
+    error_class   : Mapped[str]            = mapped_column(String(128))
+    message       : Mapped[str]            = mapped_column(Text, default="")
+    payload       : Mapped[dict[str, Any]] = mapped_column(default=dict)
+    attempts      : Mapped[int]            = mapped_column(Integer, default=0)
+    created_at    : Mapped[datetime]       = mapped_column(DateTime(timezone=True), default=_now)
+    # fmt: on

@@ -36,26 +36,30 @@ SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 @dataclass(frozen=True, slots=True)
 class QueueRow:
-    item_id: int
-    attachment_id: int
-    filename: str
-    sender: str
-    counterparty: str
-    reason_count: int
-    top_reason: str
-    state: str
-    created_at: datetime
+    # fmt: off
+    item_id       : int
+    attachment_id : int
+    filename      : str
+    sender        : str
+    counterparty  : str
+    reason_count  : int
+    top_reason    : str
+    state         : str
+    created_at    : datetime
+    # fmt: on
 
 
 @dataclass(frozen=True, slots=True)
 class FieldView:
-    name: str
-    value: Any
-    currency: str | None
-    confidence: float
-    quote: str
-    page: int | None
-    provenance: str
+    # fmt: off
+    name       : str
+    value      : Any
+    currency   : str | None
+    confidence : float
+    quote      : str
+    page       : int | None
+    provenance : str
+    # fmt: on
 
     @property
     def verified(self) -> bool:
@@ -68,18 +72,20 @@ class FieldView:
 
 @dataclass(frozen=True, slots=True)
 class ItemView:
-    item: ReviewItem
-    decision: Decision
-    attachment: Attachment
-    email: Email | None
-    fields: list[FieldView]
-    reasons: list[dict[str, Any]]
-    findings: list[dict[str, Any]]
-    trace: list[dict[str, Any]]
-    counterparty_id: str | None
-    counterparty_score: float | None
-    usd: float
-    notes: str
+    # fmt: off
+    item               : ReviewItem
+    decision           : Decision
+    attachment         : Attachment
+    email              : Email | None
+    fields             : list[FieldView]
+    reasons            : list[dict[str, Any]]
+    findings           : list[dict[str, Any]]
+    trace              : list[dict[str, Any]]
+    counterparty_id    : str | None
+    counterparty_score : float | None
+    usd                : float
+    notes              : str
+    # fmt: on
     #: Personal-data items masked at load, by category. Shown so a reviewer
     #: reading a quote with [IBAN] in it knows why, and so that "clean
     #: document" and "redaction did not run" are distinguishable.

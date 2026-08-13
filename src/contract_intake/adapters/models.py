@@ -16,9 +16,11 @@ from email.utils import parseaddr, parsedate_to_datetime
 
 @dataclass(frozen=True, slots=True)
 class InboundAttachment:
-    filename: str
-    content: bytes
-    declared_mime: str
+    # fmt: off
+    filename      : str
+    content       : bytes
+    declared_mime : str
+    # fmt: on
 
     @property
     def sha256(self) -> str:
@@ -31,12 +33,14 @@ class InboundAttachment:
 
 @dataclass(frozen=True, slots=True)
 class InboundEmail:
-    message_id: str
-    sender: str
-    subject: str
-    received_at: datetime
-    source: str
-    attachments: list[InboundAttachment] = field(default_factory=list)
+    # fmt: off
+    message_id  : str
+    sender      : str
+    subject     : str
+    received_at : datetime
+    source      : str
+    attachments : list[InboundAttachment] = field(default_factory=list)
+    # fmt: on
 
 
 def decode_mime_header(raw: str | None) -> str:

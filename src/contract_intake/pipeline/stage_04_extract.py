@@ -45,11 +45,13 @@ log = logging.getLogger(__name__)
 
 
 class ExtractStage:
-    number: ClassVar[int] = 4
-    name: ClassVar[str] = "extract"
-    consumes: ClassVar[Status] = Status.LOADED
-    produces: ClassVar[Status] = Status.EXTRACTED
-    uses_llm: ClassVar[bool] = True
+    # fmt: off
+    number   : ClassVar[int]    = 4
+    name     : ClassVar[str]    = "extract"
+    consumes : ClassVar[Status] = Status.LOADED
+    produces : ClassVar[Status] = Status.EXTRACTED
+    uses_llm : ClassVar[bool]   = True
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome:
         if ctx.llm is None:

@@ -36,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from contract_intake.extract.extractor import supports_value  # noqa: E402
+from contract_intake.extract.extractor import supports_value
 
 DOCUMENTS = Path(__file__).parent / "documents"
 
@@ -87,8 +87,7 @@ def clauses(text: str) -> list[tuple[int, str]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
+    parser.parse_args()
 
     sources = sorted(
         p for folder in ("authored", "generated") for p in (DOCUMENTS / folder).rglob("*.txt")

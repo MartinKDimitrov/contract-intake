@@ -282,11 +282,13 @@ MIN_TOTAL_HITS = 2
 
 
 class TriageStage:
-    number: ClassVar[int] = 2
-    name: ClassVar[str] = "triage"
-    consumes: ClassVar[Status] = Status.RECEIVED
-    produces: ClassVar[Status] = Status.TRIAGED
-    uses_llm: ClassVar[bool] = False
+    # fmt: off
+    number   : ClassVar[int]    = 2
+    name     : ClassVar[str]    = "triage"
+    consumes : ClassVar[Status] = Status.RECEIVED
+    produces : ClassVar[Status] = Status.TRIAGED
+    uses_llm : ClassVar[bool]   = False
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome:
         attachment = ctx.session.get(Attachment, ctx.attachment_id)

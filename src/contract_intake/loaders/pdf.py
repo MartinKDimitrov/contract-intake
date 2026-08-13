@@ -25,11 +25,13 @@ MAX_REASONABLE_PAGES = 120
 
 @dataclass(frozen=True, slots=True)
 class PdfProbe:
-    readable: bool
-    encrypted: bool
-    page_count: int
-    first_page_text: str
-    error: str | None = None
+    # fmt: off
+    readable        : bool
+    encrypted       : bool
+    page_count      : int
+    first_page_text : str
+    error           : str | None = None
+    # fmt: on
 
     @property
     def has_text_layer(self) -> bool:

@@ -46,11 +46,13 @@ log = logging.getLogger(__name__)
 
 
 class LoadStage:
-    number: ClassVar[int] = 3
-    name: ClassVar[str] = "load"
-    consumes: ClassVar[Status] = Status.TRIAGED
-    produces: ClassVar[Status] = Status.LOADED
-    uses_llm: ClassVar[bool] = False
+    # fmt: off
+    number   : ClassVar[int]    = 3
+    name     : ClassVar[str]    = "load"
+    consumes : ClassVar[Status] = Status.TRIAGED
+    produces : ClassVar[Status] = Status.LOADED
+    uses_llm : ClassVar[bool]   = False
+    # fmt: on
 
     async def run(self, ctx: StageContext) -> StageOutcome:
         attachment = ctx.session.get(Attachment, ctx.attachment_id)

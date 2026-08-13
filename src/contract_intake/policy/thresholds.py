@@ -91,14 +91,16 @@ _JURISDICTION_NOISE = (
 
 @dataclass(frozen=True, slots=True)
 class Check:
-    id: str
-    section: str
-    field: str
-    op: str
-    severity: str
-    message: str
-    params: dict[str, Any]
-    applies_to_categories: tuple[str, ...] = ()
+    # fmt: off
+    id                    : str
+    section               : str
+    field                 : str
+    op                    : str
+    severity              : str
+    message               : str
+    params                : dict[str, Any]
+    applies_to_categories : tuple[str, ...] = ()
+    # fmt: on
 
     def applies(self, vendor_category: str | None) -> bool:
         if not self.applies_to_categories:
