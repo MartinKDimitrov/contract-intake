@@ -10,7 +10,7 @@ what is stubbed, what will break first, and what to build next.
 ```bash
 make setup            # venv, dependencies, embedding model, rendered corpus
 cp .env.example .env  # then fill in the values below
-make test             # 243 tests, hermetic -- no API key, no network
+make test             # 323 tests, hermetic -- no API key, no network
 make triage           # classify 135 documents, free
 make run              # review queue on :8000
 make poll             # fetch mail and run the pipeline

@@ -4,7 +4,7 @@ What is checked, how, and — the part that matters — what a green run does no
 prove.
 
 ```bash
-make test      # 309 tests, hermetic: no API key, no network
+make test      # 323 tests, hermetic: no API key, no network
 make lint      # ruff + ruff format --check + mypy strict
 make triage    # classify every document with the real stage 02, free
 make corpus    # fetch 100 real EU procurement notices (network)
@@ -77,6 +77,13 @@ catch at the time:
   middle of a run.
 - **`tests/policy/test_thresholds.py`** — absence, unparseable values and
   unknown operators, all of which used to pass silently.
+- **`tests/pipeline/test_stage_02_triage.py`** — thirteen documents an
+  adversarial read got past the vocabulary, each with the reason. Most were the
+  same mistake: a term added because it made one of the author's own documents
+  pass. There is also a structural test that no invoice term contains another,
+  because "invoice no" and "invoice number" both contain "invoice" and one
+  sentence in a supply agreement therefore scored twice and had the contract
+  rejected.
 
 Where a test asserts the opposite of what it once asserted, its docstring says
 so and why. A test that changed direction is worth more than one that never did.

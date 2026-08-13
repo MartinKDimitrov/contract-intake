@@ -212,7 +212,7 @@ make run       # review UI, /healthz, /metrics/costs
 make poll      # IMAP poller + pipeline worker
 make stage N=04 ID=17
 make triage    # classify every document, by provenance, free
-make test      # 309 tests, hermetic -- see TESTING.md
+make test      # 323 tests, hermetic -- see TESTING.md
 make eval      # field accuracy and knowledge-base contribution (costs money)
 make dead      # what could not be finished, and why
 ```

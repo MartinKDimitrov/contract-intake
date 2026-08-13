@@ -141,6 +141,112 @@ def test_each_language_admits_contracts_and_turns_away_notices(
     assert triage.classify_text(f"{notice}\n{contract}").kind != "contract", language
 
 
+#: Documents an adversarial read of the vocabulary got past it, each with the
+#: reason it slipped. Every one of these was the vocabulary being fitted to the
+#: author's own test documents rather than to the language.
+MISCLASSIFIED = [
+    pytest.param(
+        "SUPPLY AGREEMENT\nThe Supplier shall state the invoice number on each delivery "
+        "note. The parties agree.",
+        "contract",
+        id="an agreement that mentions an invoice number is not an invoice",
+    ),
+    pytest.param(
+        "SUPPLY AGREEMENT\nPrices are quoted excluding VAT. Invoice monthly. The parties agree.",
+        "contract",
+        id="'vat' plus 'invoice' outranked one instrument marker",
+    ),
+    pytest.param(
+        "EMPLOYEE HANDBOOK - SECTION 7\nTermination of employment. Confidential "
+        "information and services.",
+        "unknown",
+        id="'termination' and 'confidential' are not instrument markers",
+    ),
+    pytest.param(
+        "PRIVACY POLICY\nGoverning law. Termination of processing. Confidential data.",
+        "unknown",
+        id="a policy announces itself in its title",
+    ),
+    pytest.param(
+        "MASTER SERVICES AGREEMENT\nbetween Danube Maintenance SARL, whose certificate "
+        "of incorporation is annexed as Schedule 1, and the certificate of insurance "
+        "under clause 12. Whereas the parties agree as follows.",
+        "contract",
+        id="a contract may require a certificate without being one",
+    ),
+    pytest.param(
+        "CONTRAT DE SERVICES\nLe present contrat est conclu entre le Prestataire et le Client.",
+        "contract",
+        id="an unaccented French contract must not be dropped",
+    ),
+    pytest.param(
+        "ANUNCIO DE LICITACION\nEl organo de contratacion convoca el presente contrato "
+        "de servicios.",
+        "unknown",
+        id="an unaccented Spanish notice must not be bought",
+    ),
+    pytest.param(
+        "AVIS D\u2019ATTRIBUTION DE MARCHE\nLe present contrat a ete attribue. "
+        "Les parties conviennent.",
+        "unknown",
+        id="the typographic apostrophe is four times commoner than the ASCII one",
+    ),
+    pytest.param(
+        "LIEFERVERTRAG\nDie Parteien vereinbaren hiermit die folgenden Bedingungen. "
+        "Anwendbares Recht ist deutsches Recht.",
+        "contract",
+        id="German verb-second word order, not only the author's phrasing",
+    ),
+    pytest.param(
+        "ABNAHMEPROTOKOLL Nr. 2026-0184\nDieser Vertrag zwischen den Parteien wird "
+        "hiermit abgenommen.",
+        "unknown",
+        id="German had no disqualifying terms at all",
+    ),
+    pytest.param(
+        "INVITATION TO TENDER - REF ITT/2026/114\nThis agreement shall be governed by "
+        "English law. Termination provisions apply.",
+        "unknown",
+        id="a tender pack reads like a contract and is not one",
+    ),
+    pytest.param(
+        "RECHNUNG Nr. 2026-00841\nMwSt 20%. Gesamtbetrag 1200 EUR. Zahlbar bis 30.09.2026.",
+        "invoice",
+        id="German invoice vocabulary was missing entirely",
+    ),
+    pytest.param(
+        "\u0414\u041e\u0413\u041e\u0412\u041e\u0420 \u0417\u0410 \u0414\u041e"
+        "\u0421\u0422\u0410\u0412\u041a\u0410\n\u041c\u0435\u0436\u0434\u0443 "
+        "\u0441\u0442\u0440\u0430\u043d\u0438\u0442\u0435 \u0441\u0435 "
+        "\u0441\u043a\u043b\u044e\u0447\u0438 \u0434\u043e\u0433\u043e\u0432"
+        "\u043e\u0440. \u0421\u0442\u0440\u0430\u043d\u0438\u0442\u0435 "
+        "\u0443\u0433\u043e\u0432\u0430\u0440\u044f\u0442. \u041f\u0440\u0438"
+        "\u043b\u043e\u0436\u0438\u043c\u043e\u0442\u043e \u043f\u0440\u0430"
+        "\u0432\u043e \u0435 \u0431\u044a\u043b\u0433\u0430\u0440\u0441\u043a"
+        "\u043e\u0442\u043e.",
+        "contract",
+        id="Bulgarian inflection: the definite form was not in the list",
+    ),
+]
+
+
+@pytest.mark.parametrize(("text", "expected"), MISCLASSIFIED)
+def test_documents_the_vocabulary_used_to_get_wrong(text: str, expected: str) -> None:
+    assert triage.classify_text(text).kind == expected
+
+
+def test_no_invoice_term_contains_another() -> None:
+    """One sentence must not score twice.
+
+    "invoice no", "invoice number" and "tax invoice" all contain "invoice", so a
+    supply agreement naming an invoice number reached two invoice hits against
+    one instrument marker and was rejected outright.
+    """
+    terms = sorted(triage.INVOICE_TERMS, key=len)
+    for index, term in enumerate(terms):
+        assert not any(term in longer for longer in terms[index + 1 :]), term
+
+
 # -- content sniffing -------------------------------------------------------
 
 

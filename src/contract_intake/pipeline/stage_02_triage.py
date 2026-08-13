@@ -24,6 +24,7 @@ throw away exactly the messy real-world case worth handling.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from pathlib import Path
 from typing import ClassVar
 
@@ -40,32 +41,40 @@ ACCEPTED_KINDS = frozenset({FileKind.PDF}) | IMAGE_KINDS
 #: Below this an image is a logo or an email signature, not a document page.
 MIN_IMAGE_BYTES = 50_000
 
+#: How much of the first line counts as the title, for disqualifying terms.
+TITLE_CHARS = 120
+
 #: Words that mark a legal instrument. A document without one of these is not a
 #: contract, whatever else it says.
 STRONG_TERMS: tuple[str, ...] = (
     # English
     "agreement",
     "whereas",
-    "the parties",
-    "both parties",
     "governing law",
     "in witness whereof",
     "counterparts",
     "shall be governed",
-    "effective date",
-    "termination",
-    "indemnif",
-    "confidential",
+    "hereby agree",
+    "is entered into",
+    "the parties agree",
+    "both parties agree",
     # Bulgarian
     "настоящия договор",
     "настоящият договор",
     "сключиха настоящия",
+    "се сключи настоящия",
     "страните се споразумяха",
+    "страните се договориха",
+    "страните уговарят",
     "приложимо право",
-    "конфиденциалн",
+    "приложимото право",
     # German
     "dieser vertrag",
+    "der vorliegende vertrag",
+    "vorliegender vertrag",
     "vereinbaren die parteien",
+    "die parteien vereinbaren",
+    "wird geschlossen zwischen",
     "anwendbares recht",
     "zwischen den parteien",
     # Spanish
@@ -87,6 +96,12 @@ SUPPORTING_TERMS: tuple[str, ...] = (
     # "hereby" belongs here, not above: certificates, declarations and
     # affidavits use it just as readily as contracts do.
     "hereby",
+    "the parties",
+    "both parties",
+    "effective date",
+    "termination",
+    "indemnif",
+    "confidential",
     "supplier",
     "vendor",
     "services",
@@ -134,14 +149,14 @@ SUPPORTING_TERMS: tuple[str, ...] = (
 
 INVOICE_TERMS: tuple[str, ...] = (
     # English
+    # No entry may contain another: "invoice no" and "invoice number" both
+    # contain "invoice", so one sentence in a supply agreement scored two
+    # invoice hits and the document was rejected as an invoice.
     "invoice",
-    "invoice no",
-    "invoice number",
     "amount due",
     "subtotal",
     "bill to",
     "vat",
-    "tax invoice",
     "payment due",
     "remit to",
     "order total",
@@ -171,6 +186,14 @@ INVOICE_TERMS: tuple[str, ...] = (
     "net à payer",
     "bon de commande",
     "avoir n",
+    # German
+    "rechnung",
+    "mwst",
+    "gesamtbetrag",
+    "nettobetrag",
+    "zahlbar bis",
+    "gutschrift",
+    "bestellnummer",
 )
 
 #: Document types that are not contracts however they are worded. A certificate
@@ -212,6 +235,25 @@ DISQUALIFYING_TERMS: tuple[str, ...] = (
     "обявление за поръчка",
     "обявление за възложена",
     "състезателна процедура",
+    # English document types that read exactly like a contract and are not one
+    "invitation to tender",
+    "request for proposal",
+    "instructions to tenderers",
+    "terms of reference",
+    "statement of work",
+    "privacy policy",
+    "employee handbook",
+    "minutes of",
+    # German
+    "zertifikat",
+    "bescheinigung",
+    "hiermit wird bescheinigt",
+    "konformitätserklärung",
+    "erklärung",
+    "abnahmeprotokoll",
+    "protokoll",
+    "prüfbericht",
+    "beschluss des vorstands",
     "certificado de",
     "certifica que",
     "declaración",
@@ -231,8 +273,6 @@ DISQUALIFYING_TERMS: tuple[str, ...] = (
     "auftragsbekanntmachung",
     "bekanntmachung",
     "vergabebekanntmachung",
-    "notice on ted",
-    "official journal",
 )
 
 #: How much of the document counts as its heading.
@@ -315,14 +355,19 @@ def _triage_pdf(path: Path) -> StageOutcome:
             "ceiling; likely a bundle rather than one contract"
         )
 
-    verdict = classify_text(result.first_page_text)
-    if verdict.kind == "invoice":
-        return Rejected(reason=f"looks like an invoice, not a contract ({verdict.evidence})")
+    # Before classifying: a page with no text layer has no vocabulary to judge,
+    # and the fragment pdfplumber scrapes off a scan is not evidence of
+    # anything. Classifying first let an invoice-shaped fragment veto a document
+    # the code had already decided it could not read.
     if not result.has_text_layer:
         return Advanced(
             note="no text layer on page 1; stage 04 will read it as an image",
             metrics={"pages": float(result.page_count)},
         )
+
+    verdict = classify_text(result.first_page_text)
+    if verdict.kind == "invoice":
+        return Rejected(reason=f"looks like an invoice, not a contract ({verdict.evidence})")
     if verdict.kind != "contract":
         return Rejected(reason=f"no contract vocabulary on page 1 ({verdict.evidence})")
 
@@ -340,6 +385,48 @@ class TextVerdict:
         self.evidence = evidence
 
 
+def _folded(terms: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(fold(t) for t in terms)
+
+
+def fold(text: str) -> str:
+    """Casefold, strip accents, and normalise the punctuation PDFs vary on.
+
+    Accents are the point. ``casefold`` alone leaves "licitación" and
+    "licitacion" as different strings, and a scanned or badly-encoded page
+    routinely carries the second -- so an unaccented French contract was turned
+    away while an unaccented Spanish tender notice was bought. The typographic
+    apostrophe matters for the same reason: the real corpus carries four of them
+    for every ASCII one, and "avis d'attribution" written with U+2019 matched
+    nothing.
+    """
+    folded = unicodedata.normalize("NFKD", text.casefold())
+    folded = "".join(c for c in folded if not unicodedata.combining(c))
+    return folded.replace("\u2019", "'").replace("\u2018", "'").replace("\u00b4", "'")
+
+
+#: The vocabulary, folded once at import on the same basis as the text it is
+#: matched against. Fold one side only and every accented term stops matching.
+_FOLDED_STRONG = _folded(STRONG_TERMS)
+_FOLDED_SUPPORTING = _folded(SUPPORTING_TERMS)
+_FOLDED_INVOICE = _folded(INVOICE_TERMS)
+_FOLDED_DISQUALIFYING = _folded(DISQUALIFYING_TERMS)
+
+
+def _title(text: str) -> str:
+    """The first non-empty line -- where a document announces what it is.
+
+    Disqualifiers used to be matched against the opening 320 characters, which
+    is a paragraph rather than a title. A contract whose recitals name an
+    annexed certificate of insurance was therefore turned away as a certificate,
+    and the docstring below anticipated exactly that case without preventing it.
+    """
+    for line in text.splitlines():
+        if line.strip():
+            return fold(line)[:TITLE_CHARS]
+    return ""
+
+
 def classify_text(text: str) -> TextVerdict:
     """Cheap vocabulary check on the first page.
 
@@ -347,20 +434,23 @@ def classify_text(text: str) -> TextVerdict:
     not to be right about hard cases -- those go on to the model, which is what
     it is for.
     """
-    lowered = text.casefold()
+    lowered = fold(text)
 
-    header = lowered[:HEADER_CHARS]
-    disqualifying = [t for t in DISQUALIFYING_TERMS if t in header]
+    disqualifying = [t for t in _FOLDED_DISQUALIFYING if t in _title(text)]
     if disqualifying:
         return TextVerdict(
             "unknown", f"declares itself a {disqualifying[0]!r} document, not an agreement"
         )
 
-    strong = [t for t in STRONG_TERMS if t in lowered]
-    supporting = [t for t in SUPPORTING_TERMS if t in lowered]
-    invoice = [t for t in INVOICE_TERMS if t in lowered]
+    strong = [t for t in _FOLDED_STRONG if t in lowered]
+    supporting = [t for t in _FOLDED_SUPPORTING if t in lowered]
+    invoice = [t for t in _FOLDED_INVOICE if t in lowered]
 
-    if len(invoice) >= 2 and len(invoice) > len(strong):
+    # An instrument marker outranks any number of invoice words. Every contract
+    # has a payment clause, and this branch rejects outright rather than sending
+    # to review, so letting it fire alongside a marker made it a silent-drop
+    # machine aimed at exactly the documents we want.
+    if not strong and len(invoice) >= 2:
         return TextVerdict("invoice", f"invoice terms: {', '.join(invoice[:3])}")
 
     if len(strong) >= MIN_STRONG_HITS and len(strong) + len(supporting) >= MIN_TOTAL_HITS:
@@ -373,4 +463,4 @@ def classify_text(text: str) -> TextVerdict:
     )
 
 
-__all__ = ["PdfProbe", "TriageStage", "classify_text"]
+__all__ = ["PdfProbe", "TriageStage", "classify_text", "fold"]
