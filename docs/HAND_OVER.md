@@ -162,6 +162,32 @@ whether to add OCR — not extraction quality, which is fine without it.
 **A contract longer than 120 pages** is rejected by triage as a probable bundle
 (`loaders/pdf.MAX_REASONABLE_PAGES`). That threshold is a guess.
 
+**A document type nobody thought to disqualify.** Triage admits on instrument
+markers and rejects on a list of document types that announce themselves --
+certificate, declaration, protocol, tender notice. The admitting side is an
+allowlist and bounded; the rejecting side is a denylist and is not. There will
+always be a kind of document nobody enumerated.
+
+Note the asymmetry inside the same module: *file* types are an allowlist
+(`ACCEPTED_KINDS`), so a video or an archive is refused without anyone having
+listed it. *Document* types are the other way round.
+
+Growing the denylist is not the answer, and neither is dropping it: it exists
+because a certificate carries instrument vocabulary too -- "hereby", "the
+parties", "governing law" -- which is precisely how three German certificates
+and an invitation to tender got through before it was widened. The direction
+worth trying is to make the admitting side decide rather than the rejecting
+side: a cheap classifier over the first page, or a single small-model call on
+the documents the vocabulary finds genuinely ambiguous, with the free
+vocabulary pass kept as the fast path for the clear cases. That keeps the
+property this stage exists for -- most documents are turned away for nothing --
+while making the uncertain ones a decision rather than an omission.
+
+Whatever replaces it has to be measured the same way: both directions, on
+`evals/documents/`, with contracts that must pass as well as lookalikes that
+must not. A vocabulary that knows nothing scores perfectly on an all-negative
+corpus.
+
 **A document in a sixth language.** The triage vocabulary covers English,
 Bulgarian, German, Spanish and French. A Romanian or Polish contract will be
 turned away with "0 instrument markers" and never reach a model. Extending it is
